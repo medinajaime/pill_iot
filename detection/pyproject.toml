@@ -1,0 +1,20 @@
+[project]
+name = "detection"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "onnxscript>=0.7.0",
+    "pandas>=3.0.2",
+    "scikit-learn>=1.8.0",
+    "torch>=2.11.0",
+    "torchvision>=0.26.0",
+]
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu128"
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true

@@ -1,0 +1,94 @@
+====================================================================================================
+HERO SMART PILL DISPENSER — BILL OF MATERIALS
+All dimensions in inches (mm in parentheses). Vol = bounding-box volume estimate.
+====================================================================================================
+
+--- FDM Printed Parts (PETG) ---
+#   Part                   Qty  W x D x H (in)               W x D x H (mm)                 Vol (cm3)    Description
+-------------------------------------------------------------------------------------------------------------------------------------------------
+1   enclosure              1    11.25 x 9.0 x 15.0           285.75 x 228.6 x 381.0         24887.758    D-profile main enclosure shell (9"W x 9"D x 15"H)
+2   button                 1    1.75 x 1.75 x 0.15           44.45 x 44.45 x 3.81           7.528        Centre multi-directional button cap
+3   pill_cup               1    2.5 x 2.68 x 1.5             63.5 x 68.07 x 38.1            164.689      Dispensing cup with solid floor and front grab tab
+4   hatch_final            1    11.25 x 9.36 x 0.27          285.75 x 237.74 x 6.86         465.899      Top loading hatch lid with hinge knuckles + snap latch
+5   usbc_port              1    0.41 x 0.1 x 0.18            10.41 x 2.54 x 4.57            0.121        USB-C port bezel insert
+6   speaker_grille         1    1.5 x 0.05 x 1.5             38.1 x 1.27 x 38.1             1.844        Speaker grille — 12-hole ring pattern
+7   cartridge              10   2.783 x 2.047 x 3.9          70.69 x 51.99 x 99.06          363.978      Pill storage cartridge (×10 installed)
+8   carousel_base          1    7.0 x 7.0 x 0.1              177.8 x 177.8 x 2.54           80.296       Carousel base plate (stationary, 0.10" thick)
+9   hub_lock               1    1.5 x 1.5 x 3.9              38.1 x 38.1 x 99.06            143.796      Central hub lock ring — couples D-shaft to carousel
+10  motor_mount            1    3.0 x 3.0 x 0.1              76.2 x 76.2 x 2.54             14.748       NEMA 17 motor mount plate (3"x3"x0.10")
+11  dispense_gate          1    1.48 x 0.92 x 0.035          37.59 x 23.37 x 0.89           0.781        Upper inlet gate for one-tablet metering chamber
+12  dispense_gate_servo_mount 1    1.3 x 0.7 x 0.83             33.02 x 17.78 x 21.08          12.377       SG90 mount for upper inlet gate
+13  dispense_release_gate  1    1.42 x 0.8 x 0.035           36.07 x 20.32 x 0.89           0.652        Lower release gate below one-tablet metering chamber
+14  dispense_release_gate_servo_mount 1    1.3 x 0.7 x 0.83             33.02 x 17.78 x 21.08          12.377       SG90 mount for lower release gate
+15  dispense_sweep_containment_band 1    7.24 x 7.24 x 0.42           183.9 x 183.9 x 10.67          360.766      Stationary OD shield backing all cartridge sweep slots
+16  dispense_sweep_rail    1    1.35 x 0.75 x 0.26           34.29 x 19.05 x 6.6            4.314        Low front linear guide rail for sweep pusher
+17  dispense_sweep_servo_mount 1    1.25 x 0.62 x 0.71           31.75 x 15.75 x 18.03          9.017        Low SG90/rack mount for front-entry pusher
+18  pill_guide             1    7.0 x 7.0 x 2.1              177.8 x 177.8 x 53.34          1686.222     Guide tube / loading chimney (R=3.5", H=2.1")
+19  pill_guide_ring        1    6.86 x 6.86 x 0.05           174.24 x 174.24 x 1.27         38.558       Top seal ring — solid ceiling with single loading port
+20  pill_chute             1    0.9 x 0.9 x 0.285            22.86 x 22.86 x 7.24           3.783        One-tablet metering chamber / sealed dispense chute
+21  loading_tube           1    3.8 x 3.8 x 3.9              96.52 x 96.52 x 99.06          922.85       Vertical loading tube (inner R=1.80", H=3.9")
+22  routing_chute          1    2.879 x 4.663 x 4.0          73.13 x 118.44 x 101.6         879.944      Static routing chute — lofted funnel, trapdoor to slot
+23  trapdoor_left          1    1.4 x 2.8 x 0.04             35.56 x 71.12 x 1.02           2.569        Trapdoor left leaf (semicircle, X<=0)
+24  trapdoor_right         1    1.4 x 2.8 x 0.04             35.56 x 71.12 x 1.02           2.569        Trapdoor right leaf (semicircle, X>=0)
+25  camera_mount           1    0.403 x 0.4 x 0.403          10.24 x 10.16 x 10.24          1.062        Camera mount bridge — 45-deg downward in annular gap
+26  chamber_ceiling        1    2.8 x 2.8 x 0.05             71.12 x 71.12 x 1.27           6.424        Frosted PETG ceiling plate — LED mount + light baffle + diffuser
+27  index_disk             1    1.196 x 1.2 x 0.05           30.38 x 30.48 x 1.27           1.176        Slotted encoder disk — 1 notch, R=0.60", T=0.05"
+28  sensor_mount           1    0.46 x 0.47 x 0.45           11.68 x 11.94 x 11.43          1.594        TCST2103 fork sensor L-bracket mount
+
+--- FDM Printed Parts (Clear/Translucent) ---
+#   Part                   Qty  W x D x H (in)               W x D x H (mm)                 Vol (cm3)    Description
+-------------------------------------------------------------------------------------------------------------------------------------------------
+1   chamber_shell          1    3.0 x 3.0 x 2.0              76.2 x 76.2 x 50.8             294.966      Optical detection chamber cylinder (R=1.50", H=2.00")
+
+--- Off-the-Shelf Components ---
+#   Part                   Qty  W x D x H (in)               W x D x H (mm)                 Vol (cm3)    Description
+-------------------------------------------------------------------------------------------------------------------------------------------------
+1   display_panel          1    3.0 x 0.08 x 3.5             76.2 x 2.03 x 88.9             13.765       Touchscreen display placeholder panel
+2   led_ring               1    2.4 x 0.05 x 2.4             60.96 x 1.27 x 60.96           4.719        Front-face status LED ring (outer R=1.2")
+3   motor_assembly         1    1.7 x 1.7 x 5.5              43.18 x 43.18 x 139.7          260.471      NEMA 17 stepper motor + D-shaft placeholder
+4   load_cell              1    2.6 x 2.6 x 0.1              66.04 x 66.04 x 2.54           11.078       Circular load-cell tray under removable pill cup
+5   servo_mount            1    1.4 x 1.07 x 0.63            35.56 x 27.18 x 16.0           15.465       SG90 servo body + ears + drive arm assembly
+6   led_ring_oc            1    0.1 x 0.0 x 0.1              2.54 x 0.0 x 2.54              0.0          Optical chamber LED ring (torus, R=1.30", at ceiling)
+7   vertical_pcb           1    3.35 x 0.363 x 2.2           85.09 x 9.22 x 55.88           43.84        Raspberry Pi 4 PCB — vertical back-wall mount
+8   vib_motor              1    0.6 x 0.6 x 0.5              15.24 x 15.24 x 12.7           2.95         Vibration motor (agitation assist, R=0.30")
+9   camera                 1    0.98 x 0.94 x 0.45           24.89 x 23.88 x 11.43          6.793        Camera module — main imaging sensor
+10  optical_interrupter    1    ? x ? x ?                    ? x ? x ?                      ?            TCST2103 fork optical interrupter (home pulse sensor)  [STEP missing]
+
+--- Hardware ---
+#   Part                   Qty  W x D x H (in)               W x D x H (mm)                 Vol (cm3)    Description
+-------------------------------------------------------------------------------------------------------------------------------------------------
+1   hinge_pin              1    0.08 x 3.0 x 0.08            2.03 x 76.2 x 2.03             0.315        Trapdoor hinge pin (Y-axis, R=0.04", L=3.00")
+2   rear_shaft             1    0.4 x 0.35 x 0.5             10.16 x 8.89 x 12.7            1.147        Rear D-shaft extension below motor body (R=0.20", L=0.50")
+
+--- Other ---
+#   Part                   Qty  W x D x H (in)               W x D x H (mm)                 Vol (cm3)    Description
+-------------------------------------------------------------------------------------------------------------------------------------------------
+1   drop_cone              1    2.1 x 2.1 x 2.15             53.34 x 53.34 x 54.61          155.373      Anti-bounce funnel between spout and pill cup
+2   dispense_sweep_pusher  1    0.58 x 0.795 x 0.115         14.73 x 20.19 x 2.92           0.869        Low front-entry TPU last-pill pusher
+3   dispense_sweep_port_seal 1    0.99 x 0.055 x 0.42          25.15 x 1.4 x 10.67            0.375        Flexible TPU wiper sealing the single pusher service window
+
+====================================================================================================
+MATERIAL SUMMARY
+  PETG printed volume (bounding-box upper bound): ~33648.5 cm3
+  At 20% infill, estimated filament volume:       ~6729.7 cm3
+  At 1.24 g/cm3 (PETG density):                  ~8345 g
+  Clear acrylic/PETG printed volume:              ~295.0 cm3
+
+FDM PRINT SPLIT (enclosure only):
+  The 15" tall enclosure is sectioned into 3 horizontal pieces:
+    Bottom  Z=0.0" to Z=5.0"  (127mm) — alcove, spout, load cell
+    Middle  Z=5.0" to Z=10.0" (127mm) — carousel, motor, guide tube
+    Top     Z=10.0" to Z=15.0" (127mm) — loading column, display, hatch
+  Alignment: 4 x 5mm pin-and-socket joints per split plane
+  Fastening: M3 brass heat inserts + M3x8 screws at 4 corners per joint
+
+PURCHASING NOTES:
+  - NEMA 17 stepper: e.g. 17HS4401 (40Ncm), ~$10
+  - SG90 servo: standard 9g micro servo, ~$2
+  - Load cell: 1kg bar type + HX711 ADC board, ~$5
+  - Raspberry Pi 4: 2GB or 4GB, ~$35–55
+  - Pi Camera v2: 8MP OV5647, ~$25
+  - LED ring: NeoPixel 16-LED ring (front) + bare LEDs (optical chamber), ~$8
+  - ERM vibration motor: 10mm coin type, ~$2
+  - Hinge pin: 1mm steel rod cut to 76mm, ~$1
+====================================================================================================

@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hero Smart Pill Dispenser — Digital Twin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0f1e;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #e0e8ff;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #header {
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(100,160,255,0.15);
+    flex-shrink: 0;
+  }
+  #header h1 { font-size: 18px; font-weight: 600; color: #7eb8ff; letter-spacing: 0.5px; }
+  #header .subtitle { font-size: 12px; color: #556; margin-top: 2px; }
+
+  #status-bar {
+    display: flex; gap: 16px; align-items: center;
+  }
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #334; transition: background 0.4s;
+  }
+  .status-dot.connected { background: #4cff8a; box-shadow: 0 0 8px #4cff8a88; }
+  .status-dot.imaging   { background: #ffdd44; box-shadow: 0 0 8px #ffdd4488; }
+  .status-dot.dispensing{ background: #ff8844; box-shadow: 0 0 8px #ff884488; }
+
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  #canvas-container { flex: 1; position: relative; }
+  canvas { display: block; width: 100% !important; height: 100% !important; }
+
+  #panel {
+    width: 280px;
+    background: rgba(255,255,255,0.03);
+    border-left: 1px solid rgba(100,160,255,0.12);
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 16px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .panel-section h3 {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: #556; margin-bottom: 10px;
+  }
+
+  .event-log {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 200px; overflow-y: auto;
+  }
+  .event-item {
+    font-size: 12px; padding: 6px 10px;
+    border-radius: 6px; border-left: 3px solid #334;
+    background: rgba(255,255,255,0.04);
+    animation: fadeIn 0.3s ease;
+  }
+  .event-item.match    { border-color: #4cff8a; }
+  .event-item.unsure   { border-color: #ffdd44; }
+  .event-item.dispense { border-color: #7eb8ff; }
+  .event-item.status   { border-color: #556; color: #778; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; } }
+
+  .slot-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  }
+  .slot-cell {
+    aspect-ratio: 1; border-radius: 6px;
+    border: 1px solid #223; background: #111a2e;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 10px; color: #445;
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .slot-cell.filled  { background: #1a2f1a; border-color: #4cff8a44; color: #4cff8a; }
+  .slot-cell.active  { border-color: #ffdd44; background: #2a2a0a; box-shadow: 0 0 8px #ffdd4444; }
+  .slot-cell.dispensing { border-color: #7eb8ff; background: #0a1a2f;
+                           animation: pulse 0.6s ease infinite alternate; }
+  @keyframes pulse { from { box-shadow: 0 0 4px #7eb8ff44; } to { box-shadow: 0 0 12px #7eb8ff99; } }
+
+  .slot-num { font-size: 13px; font-weight: 700; }
+
+  .metric { display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; padding: 4px 0; }
+  .metric .val { font-weight: 600; color: #7eb8ff; }
+
+  #legend { display: flex; flex-wrap: wrap; gap: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #778; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* Server URL prompt (shown when opened as file:// or ?server not set) */
+  #server-prompt {
+    display: none;
+    position: fixed; inset: 0; z-index: 999;
+    background: rgba(5,8,20,0.92);
+    align-items: center; justify-content: center;
+  }
+  #server-prompt.visible { display: flex; }
+  #server-prompt-box {
+    background: #0d1530; border: 1px solid #2a4080;
+    border-radius: 16px; padding: 36px 40px; max-width: 420px; width: 90%;
+    text-align: center; box-shadow: 0 0 60px #0008;
+  }
+  #server-prompt-box h2 { color: #7eb8ff; margin-bottom: 8px; font-size: 18px; }
+  #server-prompt-box p  { color: #778; font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  #server-url-input {
+    width: 100%; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid #2a4080; background: #0a0f1e;
+    color: #e0e8ff; font-size: 14px; margin-bottom: 14px;
+    outline: none;
+  }
+  #server-url-input:focus { border-color: #7eb8ff; }
+  #server-url-btn {
+    padding: 10px 28px; border-radius: 8px; border: none;
+    background: #2860c8; color: #fff; font-size: 14px;
+    font-weight: 600; cursor: pointer; transition: background 0.2s;
+  }
+  #server-url-btn:hover { background: #4080e8; }
+</style>
+</head>
+<body>
+
+<!-- Server URL prompt — shown automatically when opened as file:// -->
+<div id="server-prompt">
+  <div id="server-prompt-box">
+    <h2>🔗 Connect to Demo Server</h2>
+    <p>Enter your laptop's demo server URL.<br>
+       Run <code style="color:#7eb8ff">python demo_server.py</code> first,
+       then paste the URL shown in the terminal.</p>
+    <input id="server-url-input" type="url"
+           placeholder="http://192.168.1.X:5000" />
+    <br>
+    <button id="server-url-btn" onclick="applyServerUrl()">Connect</button>
+  </div>
+</div>
+
+<div id="header">
+  <div>
+    <h1>🏥 Hero Smart Pill Dispenser</h1>
+    <div class="subtitle">Digital Twin — v2 (polling)  ·  <span id="server-label">resolving…</span></div>
+  </div>
+  <div id="status-bar">
+    <div class="status-dot" id="conn-dot"></div>
+    <span id="conn-label" style="font-size:13px;">Connecting…</span>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvas-container"><canvas id="c"></canvas></div>
+
+  <div id="panel">
+
+    <div class="panel-section">
+      <h3>Carousel Slots</h3>
+      <div class="slot-grid" id="slot-grid">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Metrics</h3>
+      <div class="metric"><span>Status</span><span class="val" id="m-status">idle</span></div>
+      <div class="metric"><span>Pills detected</span><span class="val" id="m-detected">0</span></div>
+      <div class="metric"><span>Pills dispensed</span><span class="val" id="m-dispensed">0</span></div>
+      <div class="metric"><span>Active slot</span><span class="val" id="m-slot">—</span></div>
+      <div class="metric"><span>Last confidence</span><span class="val" id="m-conf">—</span></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Event Log</h3>
+      <div class="event-log" id="event-log"></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Legend</h3>
+      <div id="legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#4db8ff88;border:1px solid #4db8ff;"></div>
+          Chamber shell
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#f0f0f0cc;"></div>
+          Trapdoor
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#ff884455;border:1px solid #ff8844;"></div>
+          Carousel
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#ffdd44cc;"></div>
+          LED ring
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#4cff8a88;border:1px solid #4cff8a;"></div>
+          Pill
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Three.js r158 from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── Unit conversion: CAD is in inches, Three.js is unitless ───────────────
+// We use 1 unit = 1 inch for direct mapping, then scale the camera.
+const IN = 1.0;
+
+// ─── Scene setup ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f1e);
+scene.fog = new THREE.FogExp2(0x0a0f1e, 0.025);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+camera.position.set(12, 18, 20);
+camera.lookAt(0, 7.5, 4.5);   // looking at carousel Y centre
+
+// Lighting
+const ambient = new THREE.AmbientLight(0x334466, 1.2);
+scene.add(ambient);
+
+const key = new THREE.DirectionalLight(0x88aaff, 2.0);
+key.position.set(10, 20, 10);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+scene.add(key);
+
+const fill = new THREE.PointLight(0x4488ff, 1.0, 40);
+fill.position.set(-8, 12, 8);
+scene.add(fill);
+
+const ledGlow = new THREE.PointLight(0xffeeaa, 0, 6);   // LED ring glow — controlled by animation
+scene.add(ledGlow);
+
+// ─── Materials ────────────────────────────────────────────────────────────────
+const mat = {
+  enclosure:  new THREE.MeshPhysicalMaterial({ color:0x2a3a5a, roughness:0.7, metalness:0.1, transparent:true, opacity:0.5, side: THREE.DoubleSide }),
+  chamber:    new THREE.MeshPhysicalMaterial({ color:0x4db8ff, roughness:0.2, metalness:0.0, transparent:true, opacity:0.35, side: THREE.DoubleSide }),
+  trapdoor:   new THREE.MeshStandardMaterial({ color:0xf0f0f0, roughness:0.9, metalness:0.0 }),
+  carousel:   new THREE.MeshStandardMaterial({ color:0x223344, roughness:0.6, metalness:0.3 }),
+  cartridge:  new THREE.MeshPhysicalMaterial({ color:0xff8844, roughness:0.3, transparent:true, opacity:0.6 }),
+  led:        new THREE.MeshStandardMaterial({ color:0xffeeaa, emissive:0xffcc44, emissiveIntensity:0.5 }),
+  pill:       new THREE.MeshPhysicalMaterial({ color:0x44ff88, roughness:0.3, metalness:0.0, transparent:true, opacity:0.0 }),
+  pillow:     new THREE.MeshStandardMaterial({ color:0x1a2f1a }),  // pill cup
+  wire:       new THREE.LineBasicMaterial({ color:0x334466 }),
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function cylinder(r, h, mat, segs=32) {
+  const g = new THREE.CylinderGeometry(r, r, h, segs);
+  return new THREE.Mesh(g, mat);
+}
+function box(w, h, d, mat) {
+  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+}
+function ring(rIn, rOut, h, mat, segs=32) {
+  const shape = new THREE.Shape();
+  shape.absarc(0,0,rOut,0,Math.PI*2,false);
+  const hole = new THREE.Path();
+  hole.absarc(0,0,rIn,0,Math.PI*2,true);
+  shape.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(shape, { depth:h, bevelEnabled:false });
+  const m = new THREE.Mesh(g, mat);
+  m.rotation.x = -Math.PI/2;
+  return m;
+}
+
+// ─── Build dispenser geometry ─────────────────────────────────────────────────
+// All positions in inches, matching optical_chamber.py / carousel.py constants.
+// World origin = enclosure floor, Z up, Y toward front.
+// Three.js: Y up → we swap: Three Y = CAD Z, Three Z = CAD Y, Three X = CAD X.
+function cadToThree(x, y, z) { return new THREE.Vector3(x, z, y); }
+
+const CAROUSEL_X = 0, CAROUSEL_Y = 4.5;
+const SLOT_R = 2.5;   // carousel slot radius from centre
+const N_SLOTS = 10;
+const CAROUSEL_Z_BASE = 4.9, CAROUSEL_H = 4.0;
+const CHBR_OUTER_R = 1.50, CHBR_INNER_R = 1.40, CHBR_Z_BOT = 12.90, CHBR_Z_TOP = 14.90;
+const HINGE_Z = 12.92;
+const CEIL_Z = 14.85;
+const LED_MAJOR_R = 1.30;
+
+// Enclosure shell (transparent box, 9×9×15")
+const enclosureShell = box(9, 15, 9, mat.enclosure);
+enclosureShell.position.set(0, 7.5, 4.5);
+enclosureShell.castShadow = false;
+scene.add(enclosureShell);
+
+// Enclosure floor reference
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 20),
+  new THREE.MeshStandardMaterial({ color:0x0d1525, roughness:1 })
+);
+floor.rotation.x = -Math.PI/2;
+floor.position.y = -0.02;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Carousel base plate
+const carouselBase = ring(0.21, 3.45, 0.10, mat.carousel);
+carouselBase.position.set(CAROUSEL_X, CAROUSEL_Z_BASE, CAROUSEL_Y);
+scene.add(carouselBase);
+
+// Carousel disk (rotates)
+const carouselGroup = new THREE.Group();
+carouselGroup.position.set(CAROUSEL_X, CAROUSEL_Z_BASE + 0.10, CAROUSEL_Y);
+scene.add(carouselGroup);
+
+// 10 cartridge slots on carousel
+const cartridges = [];
+for (let i = 0; i < N_SLOTS; i++) {
+  const angle = (i / N_SLOTS) * Math.PI * 2;
+  const cx = Math.sin(angle) * SLOT_R;
+  const cy = Math.cos(angle) * SLOT_R;
+  const cart = cylinder(0.55, 3.9, mat.cartridge.clone());
+  cart.position.set(cx, 1.95, cy);
+  cart.castShadow = true;
+  carouselGroup.add(cart);
+  cartridges.push(cart);
+}
+
+// Loading tube
+const loadTube = ring(1.80, 1.90, 3.90, new THREE.MeshPhysicalMaterial({
+  color:0x44ff88, roughness:0.1, transparent:true, opacity:0.2, side:THREE.DoubleSide
+}));
+loadTube.position.set(CAROUSEL_X, 11.00, CAROUSEL_Y);
+scene.add(loadTube);
+
+// Optical chamber shell
+const chamberMesh = ring(CHBR_INNER_R, CHBR_OUTER_R, 2.00, mat.chamber);
+chamberMesh.position.set(CAROUSEL_X, CHBR_Z_BOT, CAROUSEL_Y);
+scene.add(chamberMesh);
+
+// Trapdoor (two semicircle leaves, merge into one disc for simplicity)
+const tdGeo = new THREE.CylinderGeometry(1.40, 1.40, 0.04, 32);
+const trapdoor = new THREE.Mesh(tdGeo, mat.trapdoor);
+trapdoor.position.set(CAROUSEL_X, HINGE_Z, CAROUSEL_Y);
+scene.add(trapdoor);
+
+// Trapdoor left/right leaves (for split animation)
+const tdLeftGeo = new THREE.CylinderGeometry(1.40, 1.40, 0.04, 32, 1, false, 0, Math.PI);
+const tdLeft  = new THREE.Mesh(tdLeftGeo,  mat.trapdoor);
+const tdRight = new THREE.Mesh(tdLeftGeo.clone(), mat.trapdoor);
+tdLeft.position.set(CAROUSEL_X, HINGE_Z, CAROUSEL_Y);
+tdRight.position.set(CAROUSEL_X, HINGE_Z, CAROUSEL_Y);
+tdLeft.rotation.y  = 0;
+tdRight.rotation.y = Math.PI;
+const tdGroup = new THREE.Group();
+tdGroup.add(tdLeft);
+tdGroup.add(tdRight);
+scene.add(tdGroup);
+trapdoor.visible = false;  // use individual leaves
+
+// Ceiling plate
+const ceiling = ring(0.60, CHBR_INNER_R, 0.05, new THREE.MeshPhysicalMaterial({
+  color:0xccffdd, roughness:0.2, transparent:true, opacity:0.5
+}));
+ceiling.position.set(CAROUSEL_X, CEIL_Z, CAROUSEL_Y);
+scene.add(ceiling);
+
+// LED ring
+const ledRingGeo = new THREE.TorusGeometry(LED_MAJOR_R, 0.05, 8, 32);
+const ledRingMesh = new THREE.Mesh(ledRingGeo, mat.led.clone());
+ledRingMesh.position.set(CAROUSEL_X, CEIL_Z, CAROUSEL_Y);
+ledRingMesh.rotation.x = Math.PI/2;
+scene.add(ledRingMesh);
+
+// Camera mount (small box on -X side)
+const camMount = box(0.30, 0.30, 0.40, new THREE.MeshStandardMaterial({color:0x111111}));
+camMount.position.set(-1.65, 14.42, CAROUSEL_Y);
+camMount.rotation.z = Math.PI/4;  // 45° tilt
+scene.add(camMount);
+
+// Pill (starts invisible, animated during detection)
+// CapsuleGeometry was added in Three.js r140; r128 doesn't have it, so fall back to a sphere.
+const pillGeo = (typeof THREE.CapsuleGeometry === 'function')
+  ? new THREE.CapsuleGeometry(0.18, 0.35, 4, 16)
+  : new THREE.SphereGeometry(0.22, 16, 12);
+const pillMesh = new THREE.Mesh(pillGeo, mat.pill);
+pillMesh.position.set(CAROUSEL_X, HINGE_Z + 0.5, CAROUSEL_Y);
+pillMesh.castShadow = true;
+scene.add(pillMesh);
+
+// Pill cup (alcove)
+const pillCup = cylinder(0.60, 0.80, mat.pillow);
+pillCup.position.set(CAROUSEL_X, 0.40, CAROUSEL_Y + SLOT_R);
+scene.add(pillCup);
+
+// ─── Slot UI grid (panel) ────────────────────────────────────────────────────
+const slotGrid = document.getElementById('slot-grid');
+const slotCells = [];
+for (let i = 1; i <= N_SLOTS; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'slot-cell';
+  cell.innerHTML = `<span class="slot-num">${i}</span>`;
+  slotGrid.appendChild(cell);
+  slotCells.push(cell);
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const state = {
+  status: 'idle',
+  detected: 0,
+  dispensed: 0,
+  activeSlot: null,
+  carouselAngle: 0,
+  targetCarouselAngle: 0,
+  trapdoorAngle: 0,         // 0=closed, PI/2=open
+  targetTrapdoorAngle: 0,
+  pillOpacity: 0,
+  targetPillOpacity: 0,
+  pillY: HINGE_Z + 0.5,
+  targetPillY: HINGE_Z + 0.5,
+  ledIntensity: 0,
+  targetLedIntensity: 0,
+  dispensingPillY: null,
+};
+
+// ─── Animation helpers ────────────────────────────────────────────────────────
+function lerp(a, b, t) { return a + (b - a) * t; }
+function shortAngle(a, b) {
+  let d = b - a;
+  while (d > Math.PI)  d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+function slotAngle(slotNum) {
+  // Slot 1 at angle 0; slots increment clockwise
+  return ((slotNum - 1) / N_SLOTS) * Math.PI * 2;
+}
+
+// ─── Event handlers ───────────────────────────────────────────────────────────
+function onDetectionMatch(event) {
+  state.detected++;
+  document.getElementById('m-detected').textContent = state.detected;
+  document.getElementById('m-conf').textContent =
+    ((event.confidence || 0) * 100).toFixed(0) + '%';
+
+  const slot = parseInt(event.slot) || 1;
+  state.activeSlot = slot;
+  document.getElementById('m-slot').textContent = slot;
+
+  if (slotCells[slot - 1]) {
+    slotCells.forEach(c => c.classList.remove('active'));
+    slotCells[slot - 1].classList.add('active');
+  }
+
+  // Animate: pill appears → LED on → trapdoor opens → carousel rotates
+  state.targetPillOpacity = 0.95;
+  state.targetLedIntensity = 3.0;
+  setTimeout(() => {
+    state.targetTrapdoorAngle = Math.PI / 2;  // open
+    // Rotate carousel to slot
+    const target = slotAngle(slot);
+    const delta = shortAngle(state.targetCarouselAngle, target);
+    state.targetCarouselAngle += delta;
+  }, 900);
+  setTimeout(() => {
+    state.targetPillY = CHBR_Z_BOT - 2;  // pill drops
+    state.targetPillOpacity = 0;
+  }, 1800);
+  setTimeout(() => {
+    state.targetTrapdoorAngle = 0;         // close
+    state.targetLedIntensity = 0;
+    state.targetPillY = HINGE_Z + 0.5;    // reset
+
+    if (slotCells[slot - 1]) {
+      slotCells[slot - 1].classList.remove('active');
+      slotCells[slot - 1].classList.add('filled');
+    }
+  }, 2600);
+}
+
+function onDispenseComplete(event) {
+  state.dispensed++;
+  document.getElementById('m-dispensed').textContent = state.dispensed;
+
+  const slot = parseInt(event.slot) || state.activeSlot || 1;
+  // Rotate to slot, then animate pill falling into cup
+  const target = slotAngle(slot);
+  const delta = shortAngle(state.targetCarouselAngle, target);
+  state.targetCarouselAngle += delta;
+
+  setTimeout(() => {
+    // Flash cartridge for that slot
+    if (cartridges[slot - 1]) {
+      const orig = cartridges[slot - 1].material.color.clone();
+      cartridges[slot - 1].material.color.set(0xffffff);
+      setTimeout(() => cartridges[slot - 1].material.color.copy(orig), 400);
+    }
+    if (slotCells[slot - 1]) {
+      slotCells[slot - 1].classList.remove('filled', 'active', 'dispensing');
+    }
+  }, 800);
+}
+
+function onLoadingStarted(event) {
+  const slot = parseInt(event.slot) || 1;
+  state.activeSlot = slot;
+  document.getElementById('m-slot').textContent = slot;
+  // Rotate to loading slot
+  const target = slotAngle(slot);
+  const delta = shortAngle(state.targetCarouselAngle, target);
+  state.targetCarouselAngle += delta;
+}
+
+function onStatusChange(value) {
+  state.status = value;
+  document.getElementById('m-status').textContent = value;
+  const dot = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  dot.className = 'status-dot ' + value;
+  label.textContent = { idle:'Idle', imaging:'Imaging pill…',
+    dispensing:'Dispensing…', error:'Error' }[value] || value;
+}
+
+// ─── Event log ────────────────────────────────────────────────────────────────
+function logEvent(text, type='status') {
+  const log = document.getElementById('event-log');
+  const item = document.createElement('div');
+  item.className = `event-item ${type}`;
+  item.textContent = new Date().toLocaleTimeString('zh-TW', {hour12:false}) + '  ' + text;
+  log.prepend(item);
+  while (log.children.length > 20) log.removeChild(log.lastChild);
+}
+
+// ─── Polling connection (replaces SSE — works with any WSGI server) ──────────
+//
+// Every 500 ms the viewer calls GET /events/recent?since=<id>.
+// The server returns {status, events: [...], next_id} as plain JSON.
+// No streaming, no buffering problems, works on Windows with Waitress.
+
+let _serverBase = null;
+let _pollId     = 0;      // last event id received; next poll asks for > this
+let _pollTimer  = null;
+let _connected  = false;
+
+// ── Resolve server URL ───────────────────────────────────────────────────────
+// Priority: 1) ?server= query param  2) same origin (served by Flask)  3) prompt
+function resolveServerUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('server')) return params.get('server').replace(/\/$/, '');
+  const origin = window.location.origin;
+  if (!origin || origin === 'null' || window.location.protocol === 'file:') return null;
+  return origin;
+}
+
+function applyServerUrl() {
+  const input = document.getElementById('server-url-input').value.trim().replace(/\/$/, '');
+  if (!input) return;
+  _serverBase = input;
+  document.getElementById('server-prompt').classList.remove('visible');
+  startPolling();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('server-url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyServerUrl();
+  });
+});
+
+// ── Poll loop ────────────────────────────────────────────────────────────────
+function startPolling() {
+  if (!_serverBase) {
+    _serverBase = resolveServerUrl();
+  }
+  if (!_serverBase) {
+    document.getElementById('server-prompt').classList.add('visible');
+    document.getElementById('conn-label').textContent = 'Enter server URL →';
+    document.getElementById('server-label').textContent = 'no server';
+    console.log('[viewer] No server URL — file:// or origin missing');
+    return;
+  }
+  document.getElementById('server-label').textContent = _serverBase;
+  console.log('[viewer] Polling started against:', _serverBase + '/events/recent');
+  _poll();
+}
+
+function _poll() {
+  const url = `${_serverBase}/events/recent?since=${_pollId}`;
+  // AbortSignal.timeout() requires Chrome 103+ — use AbortController for compat
+  const ctrl    = new AbortController();
+  const timerId = setTimeout(() => ctrl.abort(), 4000);
+  fetch(url, { signal: ctrl.signal })
+    .then(r => {
+      clearTimeout(timerId);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      // ── Connected ──
+      if (!_connected) {
+        _connected = true;
+        document.getElementById('conn-dot').className = 'status-dot connected';
+        document.getElementById('conn-label').textContent = 'Connected';
+        logEvent('Connected to dispenser server', 'status');
+        console.log('[viewer] First poll OK:', data);
+      }
+
+      // ── Server status ──
+      onStatusChange(data.status || 'idle');
+
+      // ── New events since last poll ──
+      (data.events || []).forEach(ev => handleEvent(ev));
+
+      // Advance the cursor
+      if (typeof data.next_id === 'number') _pollId = data.next_id;
+
+      _pollTimer = setTimeout(_poll, 500);
+    })
+    .catch((err) => {
+      clearTimeout(timerId);
+      // Connection lost / server not reachable
+      _connected = false;
+      document.getElementById('conn-dot').className = 'status-dot';
+      document.getElementById('conn-label').textContent = 'Reconnecting…';
+      console.warn('[viewer] Poll failed:', err && err.message || err, 'url=', url);
+      _pollTimer = setTimeout(_poll, 2000);   // retry slower when down
+    });
+}
+
+// ── Event dispatcher (same logic as the old SSE onmessage) ──────────────────
+function handleEvent(data) {
+  const ev = data.event || '';
+  switch (ev) {
+    case 'status':
+      onStatusChange(data.value || 'idle');
+      break;
+    case 'detection_result':
+      if (data.result === 'MATCH') {
+        onDetectionMatch(data);
+        logEvent(`✓ MATCH  slot ${data.slot}  ${((data.confidence||0)*100).toFixed(0)}%`, 'match');
+      } else if (data.result === 'UNSURE') {
+        logEvent(`? UNSURE  slot ${data.slot}`, 'unsure');
+      } else {
+        logEvent(`✗ NO_MATCH`, 'status');
+      }
+      break;
+    case 'dispense_complete':
+      onDispenseComplete(data);
+      logEvent(`💊 Dispensed  slot ${data.slot}  ${data.weight_measured_mg||'?'}mg`, 'dispense');
+      break;
+    case 'loading_started':
+      onLoadingStarted(data);
+      logEvent(`📥 Loading slot ${data.slot}`, 'match');
+      break;
+    case 'loading_complete':
+      logEvent(`✅ Loading done  ${data.total_pills} pills`, 'match');
+      break;
+    case 'prescription_ack':
+      logEvent(`📋 Prescription loaded  ${data.count} meds`, 'status');
+      break;
+  }
+}
+
+// ─── Orbit controls (simple mouse drag) ──────────────────────────────────────
+let isDragging = false, lastX = 0, lastY = 0;
+let spherical = { theta: Math.atan2(12, 20), phi: Math.atan2(18, Math.sqrt(12*12+20*20)) };
+const orbitRadius = 26;
+
+document.getElementById('canvas-container').addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  spherical.theta -= (e.clientX - lastX) * 0.008;
+  spherical.phi   = Math.max(0.1, Math.min(Math.PI/2 - 0.05, spherical.phi - (e.clientY - lastY) * 0.006));
+  lastX = e.clientX; lastY = e.clientY;
+  camera.position.set(
+    orbitRadius * Math.sin(spherical.phi) * Math.sin(spherical.theta),
+    orbitRadius * Math.cos(spherical.phi) + 7.5,
+    orbitRadius * Math.sin(spherical.phi) * Math.cos(spherical.theta) + 4.5
+  );
+  camera.lookAt(0, 7.5, 4.5);
+});
+
+// Scroll to zoom
+window.addEventListener('wheel', e => {
+  camera.fov = Math.max(20, Math.min(80, camera.fov + e.deltaY * 0.02));
+  camera.updateProjectionMatrix();
+});
+
+// ─── Resize handler ───────────────────────────────────────────────────────────
+function onResize() {
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth, h = container.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t = Math.min(dt * 3, 1);   // lerp speed
+
+  // Smooth carousel rotation
+  state.carouselAngle += shortAngle(state.carouselAngle, state.targetCarouselAngle) * t;
+  carouselGroup.rotation.y = -state.carouselAngle;
+
+  // Trapdoor animation (leaves hinge open/close)
+  state.trapdoorAngle = lerp(state.trapdoorAngle, state.targetTrapdoorAngle, t);
+  tdLeft.rotation.z  =  state.trapdoorAngle;
+  tdRight.rotation.z = -state.trapdoorAngle;
+
+  // Pill opacity and drop
+  state.pillOpacity = lerp(state.pillOpacity, state.targetPillOpacity, t);
+  mat.pill.opacity  = state.pillOpacity;
+  state.pillY = lerp(state.pillY, state.targetPillY, t * 0.6);
+  pillMesh.position.y = state.pillY;
+
+  // LED glow
+  state.ledIntensity = lerp(state.ledIntensity, state.targetLedIntensity, t);
+  ledGlow.intensity  = state.ledIntensity;
+  ledGlow.position.set(CAROUSEL_X, CEIL_Z, CAROUSEL_Y);
+  mat.led.emissiveIntensity = 0.5 + state.ledIntensity * 0.3;
+
+  // Subtle idle rotation for visual interest
+  if (Math.abs(shortAngle(state.carouselAngle, state.targetCarouselAngle)) < 0.005) {
+    // tiny ambient wobble
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+startPolling();
+animate();
+
+// Touch support for mobile
+document.getElementById('canvas-container').addEventListener('touchstart', e => {
+  isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+}, {passive:true});
+document.getElementById('canvas-container').addEventListener('touchend', () => isDragging = false);
+document.getElementById('canvas-container').addEventListener('touchmove', e => {
+  if (!isDragging) return;
+  const dx = e.touches[0].clientX - lastX, dy = e.touches[0].clientY - lastY;
+  spherical.theta -= dx * 0.008;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI/2 - 0.05, spherical.phi - dy * 0.006));
+  lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+  camera.position.set(
+    orbitRadius * Math.sin(spherical.phi) * Math.sin(spherical.theta),
+    orbitRadius * Math.cos(spherical.phi) + 7.5,
+    orbitRadius * Math.sin(spherical.phi) * Math.cos(spherical.theta) + 4.5
+  );
+  camera.lookAt(0, 7.5, 4.5);
+}, {passive:true});
+</script>
+</body>
+</html>

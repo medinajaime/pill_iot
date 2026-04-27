@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Hero Pill Dispenser — Python dependencies
+#
+# TWO environments:
+#   Desktop (RTX 5080, Windows/Linux)  ← you are here for pitch demo + training
+#   Pi 4 (ARM64, Linux)                ← production hardware
+#
+# Install for RTX 5080 (CUDA 12.8, Blackwell arch):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   pip install -r requirements.txt
+#
+# Install for Pi 4:
+#   pip install -r requirements.txt --extra-index-url https://pypi.org/simple
+#   (onnxruntime-gpu not available on ARM64; plain onnxruntime used automatically)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Core image processing (all platforms) ────────────────────────────────────
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# ── Web server (demo_server.py + ble_server.py HTTP fallback) ─────────────────
+flask>=3.0.0
+flask-cors>=4.0.0        # allow phone on same LAN to hit the server
+waitress>=3.0.0          # Windows-safe streaming WSGI server (fixes SSE buffering)
+
+# ── Training — desktop only (RTX 5080) ───────────────────────────────────────
+# torch + torchvision MUST be installed separately with the CUDA 12.8 index:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# These are listed here so pip knows the version floor after you install them:
+torch>=2.7.0
+torchvision>=0.22.0
+onnx>=1.16.0
+tqdm>=4.66.0
+scikit-learn>=1.4.0
+pandas>=2.0.0
+
+# ── Inference — ONNX Runtime ──────────────────────────────────────────────────
+# Desktop (RTX 5080):  onnxruntime-gpu   ← GPU inference via CUDA 12.8
+# Pi 4 (ARM64):        onnxruntime       ← CPU inference only
+#
+# The model.py provider list already handles the fallback:
+#   ["CUDAExecutionProvider", "CPUExecutionProvider"]
+# so the same model.py code works on both machines.
+#
+# On your RTX 5080 machine run:
+#   pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
+# On Pi run:
+#   pip install onnxruntime
+onnxruntime-gpu>=1.18.0   # change to onnxruntime on Pi
+
+# ── Pi-only hardware drivers (skip on desktop) ────────────────────────────────
+# picamera2:      sudo apt install python3-picamera2
+# neopixel:       pip install adafruit-circuitpython-neopixel rpi_ws281x
+# RPi.GPIO:       sudo apt install python3-rpi.gpio
+# HX711:          pip install hx711
+# BLE peripheral: pip install bless && sudo apt install bluetooth bluez python3-dbus
