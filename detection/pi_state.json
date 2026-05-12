@@ -1,0 +1,57 @@
+{
+  "device_info": {
+    "device_id": "HERO-PI-DEMO-001",
+    "serial_number": "SPD-2026-TW-00001",
+    "firmware_version": "1.0.0-demo",
+    "model": "Hero Smart Pill Dispenser",
+    "compartment_count": 10,
+    "boot_time": "2026-05-05T11:12:18+08:00"
+  },
+  "slots": {
+    "A1": {
+      "compartmentId": "A1",
+      "medicationId": "med_001",
+      "medicationName": "脈優錠 5 毫克",
+      "genericName": "Amlodipine",
+      "dosage": "5mg",
+      "quantity": 30,
+      "frequency": "QD",
+      "instructions": "每日早餐後服用一顆",
+      "daysSupply": 30,
+      "nhi_code": "med_001",
+      "nhiCode": null,
+      "pillImprint": null,
+      "pillColor": "白色",
+      "pillShape": "圓形"
+    },
+    "A2": {
+      "compartmentId": "A2",
+      "medicationId": "med_002",
+      "medicationName": "立普妥膜衣錠 10 毫克",
+      "genericName": "Atorvastatin",
+      "dosage": "10mg",
+      "quantity": 30,
+      "frequency": "QD",
+      "instructions": "每日晚餐後服用一顆",
+      "daysSupply": 30,
+      "nhi_code": "med_002",
+      "nhiCode": null,
+      "pillImprint": null,
+      "pillColor": "白色",
+      "pillShape": "橢圓形"
+    }
+  },
+  "slot_state": {
+    "1": {
+      "compartmentNumber": 1,
+      "medicationId": "med_001",
+      "medicationName": "slot 1",
+      "pillCount": 1,
+      "isEmpty": false,
+      "needsRefill": false,
+      "loaded": true
+    }
+  },
+  "paired_user_id": "tester",
+  "saved_at": "2026-05-05T15:34:13+08:00"
+}

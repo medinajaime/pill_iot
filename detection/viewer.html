@@ -28,21 +28,42 @@
   #header h1 { font-size: 18px; font-weight: 600; color: #7eb8ff; letter-spacing: 0.5px; }
   #header .subtitle { font-size: 12px; color: #556; margin-top: 2px; }
 
-  #status-bar {
-    display: flex; gap: 16px; align-items: center;
-  }
+  #status-bar { display: flex; gap: 16px; align-items: center; }
   .status-dot {
     width: 10px; height: 10px; border-radius: 50%;
     background: #334; transition: background 0.4s;
   }
-  .status-dot.connected { background: #4cff8a; box-shadow: 0 0 8px #4cff8a88; }
-  .status-dot.imaging   { background: #ffdd44; box-shadow: 0 0 8px #ffdd4488; }
-  .status-dot.dispensing{ background: #ff8844; box-shadow: 0 0 8px #ff884488; }
+  .status-dot.connected  { background: #4cff8a; box-shadow: 0 0 8px #4cff8a88; }
+  .status-dot.loading    { background: #ffdd44; box-shadow: 0 0 8px #ffdd4488; }
+  .status-dot.dispensing { background: #ff8844; box-shadow: 0 0 8px #ff884488; }
+
+  .status-dot.server { background: #ffdd44; box-shadow: 0 0 8px #ffdd4488; }
 
   #main { display: flex; flex: 1; overflow: hidden; }
 
   #canvas-container { flex: 1; position: relative; }
   canvas { display: block; width: 100% !important; height: 100% !important; }
+
+  /* Loading overlay */
+  #loading-overlay {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(10,15,30,0.94);
+  }
+  #loading-overlay.hidden { display: none; }
+  #loading-title { color: #7eb8ff; font-size: 15px; margin-bottom: 16px; }
+  #loading-bar-wrap {
+    width: 240px; height: 6px;
+    background: #1a2a4a; border-radius: 3px; overflow: hidden;
+  }
+  #loading-bar {
+    height: 100%; width: 0%; background: #7eb8ff;
+    transition: width 0.2s; border-radius: 3px;
+  }
+  #loading-pct { color: #556; font-size: 12px; margin-top: 8px; }
+  #loading-error { color: #ff6644; font-size: 13px; margin-top: 12px; display: none; text-align: center; max-width: 300px; }
+  #loading-hint  { color: #445; font-size: 11px; margin-top: 20px; text-align: center; max-width: 320px; line-height: 1.6; }
 
   #panel {
     width: 280px;
@@ -50,10 +71,8 @@
     border-left: 1px solid rgba(100,160,255,0.12);
     padding: 20px 16px;
     display: flex; flex-direction: column; gap: 16px;
-    overflow-y: auto;
-    flex-shrink: 0;
+    overflow-y: auto; flex-shrink: 0;
   }
-
   .panel-section h3 {
     font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
     text-transform: uppercase; color: #556; margin-bottom: 10px;
@@ -75,38 +94,86 @@
   .event-item.status   { border-color: #556; color: #778; }
   @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; } }
 
-  .slot-grid {
-    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
-  }
+  .slot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
   .slot-cell {
     aspect-ratio: 1; border-radius: 6px;
     border: 1px solid #223; background: #111a2e;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    font-size: 10px; color: #445;
-    transition: all 0.3s;
-    cursor: default;
+    font-size: 10px; color: #445; transition: all 0.3s; cursor: default;
   }
-  .slot-cell.filled  { background: #1a2f1a; border-color: #4cff8a44; color: #4cff8a; }
-  .slot-cell.active  { border-color: #ffdd44; background: #2a2a0a; box-shadow: 0 0 8px #ffdd4444; }
-  .slot-cell.dispensing { border-color: #7eb8ff; background: #0a1a2f;
-                           animation: pulse 0.6s ease infinite alternate; }
+  .slot-cell.filled    { background: #1a2f1a; border-color: #4cff8a44; color: #4cff8a; }
+  .slot-cell.active    { border-color: #ffdd44; background: #2a2a0a; box-shadow: 0 0 8px #ffdd4444; }
+  .slot-cell.dispensing{ border-color: #7eb8ff; background: #0a1a2f;
+                          animation: pulse 0.6s ease infinite alternate; }
   @keyframes pulse { from { box-shadow: 0 0 4px #7eb8ff44; } to { box-shadow: 0 0 12px #7eb8ff99; } }
-
   .slot-num { font-size: 13px; font-weight: 700; }
 
   .metric { display: flex; justify-content: space-between; align-items: center;
             font-size: 13px; padding: 4px 0; }
   .metric .val { font-weight: 600; color: #7eb8ff; }
 
-  #legend { display: flex; flex-wrap: wrap; gap: 10px; }
-  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #778; }
-  .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+  /* Medication name overlay — shown during dispense */
+  #med-overlay {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 15, 30, 0.88); border: 1px solid #7eb8ff55;
+    border-radius: 12px; padding: 12px 28px; z-index: 5;
+    text-align: center; pointer-events: none;
+    transition: opacity 0.4s; opacity: 0;
+  }
+  #med-overlay.visible { opacity: 1; }
+  #med-overlay .med-label { font-size: 11px; color: #556; letter-spacing: 1px; text-transform: uppercase; }
+  #med-overlay .med-name  { font-size: 18px; font-weight: 700; color: #7eb8ff; margin-top: 2px; }
 
-  /* Server URL prompt (shown when opened as file:// or ?server not set) */
+  /* Large detection result flash — centre-screen, visible on projector */
+  #detect-flash {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.85);
+    background: rgba(8, 14, 28, 0.92);
+    border: 3px solid #334; border-radius: 20px;
+    padding: 28px 48px; z-index: 7; text-align: center;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.25s, transform 0.25s, border-color 0.25s;
+    min-width: 280px;
+  }
+  #detect-flash.visible {
+    opacity: 1; transform: translate(-50%, -50%) scale(1);
+  }
+  #detect-flash .df-label {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: #556; margin-bottom: 8px;
+  }
+  #detect-flash .df-result {
+    font-size: 36px; font-weight: 800; letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  #detect-flash .df-name {
+    font-size: 16px; color: #aac; margin-bottom: 10px;
+  }
+  #detect-flash .df-conf-wrap {
+    height: 8px; background: #182038; border-radius: 4px; overflow: hidden;
+    margin: 0 auto; max-width: 200px;
+  }
+  #detect-flash .df-conf-bar {
+    height: 100%; width: 0%; border-radius: 4px;
+    transition: width 0.4s;
+  }
+
+  #cam-panel {
+    position: absolute; top: 16px; right: 16px; z-index: 6;
+    width: 220px; border: 2px solid #334; border-radius: 12px;
+    background: rgba(10, 15, 30, 0.9); overflow: hidden;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s, border-color 0.3s;
+  }
+  #cam-panel.visible { opacity: 1; }
+  #cam-title { padding: 8px 10px; font-size: 11px; color: #7eb8ff; letter-spacing: 0.8px; text-transform: uppercase; }
+  #cam-feed { display: block; width: 100%; height: 150px; object-fit: cover; background: #050814; }
+  .confidence-wrap { height: 6px; background: #18233a; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  #det-confidence-bar { height: 100%; width: 0%; background: #556; transition: width 0.3s, background 0.3s; }
+
+  /* Server URL prompt */
   #server-prompt {
-    display: none;
-    position: fixed; inset: 0; z-index: 999;
+    display: none; position: fixed; inset: 0; z-index: 999;
     background: rgba(5,8,20,0.92);
     align-items: center; justify-content: center;
   }
@@ -121,8 +188,7 @@
   #server-url-input {
     width: 100%; padding: 10px 14px; border-radius: 8px;
     border: 1px solid #2a4080; background: #0a0f1e;
-    color: #e0e8ff; font-size: 14px; margin-bottom: 14px;
-    outline: none;
+    color: #e0e8ff; font-size: 14px; margin-bottom: 14px; outline: none;
   }
   #server-url-input:focus { border-color: #7eb8ff; }
   #server-url-btn {
@@ -142,8 +208,7 @@
     <p>Enter your laptop's demo server URL.<br>
        Run <code style="color:#7eb8ff">python demo_server.py</code> first,
        then paste the URL shown in the terminal.</p>
-    <input id="server-url-input" type="url"
-           placeholder="http://192.168.1.X:5000" />
+    <input id="server-url-input" type="url" placeholder="http://192.168.1.X:5000" />
     <br>
     <button id="server-url-btn" onclick="applyServerUrl()">Connect</button>
   </div>
@@ -152,7 +217,7 @@
 <div id="header">
   <div>
     <h1>🏥 Hero Smart Pill Dispenser</h1>
-    <div class="subtitle">Digital Twin — v2 (polling)  ·  <span id="server-label">resolving…</span></div>
+    <div class="subtitle">Digital Twin — v6 (functional system)  ·  <span id="server-label">resolving…</span></div>
   </div>
   <div id="status-bar">
     <div class="status-dot" id="conn-dot"></div>
@@ -161,15 +226,62 @@
 </div>
 
 <div id="main">
-  <div id="canvas-container"><canvas id="c"></canvas></div>
+  <div id="canvas-container">
+
+    <!-- Loading overlay — hidden once GLB finishes downloading -->
+    <div id="loading-overlay">
+      <div id="loading-title">Loading Fusion 360 model…</div>
+      <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+      <div id="loading-pct">0%</div>
+      <div id="loading-error"></div>
+      <div id="loading-hint">
+        Make sure the server is running and<br>
+        <code style="color:#7eb8ff">hero_full_assembly.glb</code> has been exported<br>
+        from Fusion 360 to the <code style="color:#7eb8ff">output/</code> folder.
+      </div>
+    </div>
+
+    <canvas id="c"></canvas>
+
+    <!-- Medication name overlay — visible during active dispense -->
+    <div id="med-overlay">
+      <div class="med-label">Dispensing</div>
+      <div class="med-name" id="med-name-text">—</div>
+    </div>
+
+    <div id="cam-panel">
+      <div id="cam-title">AI 藥丸辨識</div>
+      <img id="cam-feed" alt="Latest pill capture" />
+    </div>
+
+    <!-- Large centre-screen detection result flash -->
+    <div id="detect-flash">
+      <div class="df-label">AI Detection</div>
+      <div class="df-result" id="df-result-text">—</div>
+      <div class="df-name" id="df-name-text">—</div>
+      <div class="df-conf-wrap">
+        <div class="df-conf-bar" id="df-conf-bar"></div>
+      </div>
+    </div>
+  </div>
 
   <div id="panel">
 
+    <div class="panel-section" id="setup-qr-section" style="text-align:center;">
+      <h3>📱 Pair App</h3>
+      <p style="font-size:11px;color:#667;margin-bottom:8px;">Scan with the Hero app to connect</p>
+      <img id="setup-qr-img" src="/setup.png" alt="Setup QR"
+           style="width:140px;height:140px;border-radius:8px;border:2px solid #4CAF50;cursor:pointer;"
+           onclick="window.open('/setup','_blank')"
+           onerror="document.getElementById('setup-qr-section').style.display='none'">
+      <p style="font-size:10px;color:#889;margin-top:6px;">
+        <a href="/setup" target="_blank" style="color:#4a90d9;text-decoration:none;">Open full setup page ↗</a>
+      </p>
+    </div>
+
     <div class="panel-section">
       <h3>Carousel Slots</h3>
-      <div class="slot-grid" id="slot-grid">
-        <!-- filled by JS -->
-      </div>
+      <div class="slot-grid" id="slot-grid"></div>
     </div>
 
     <div class="panel-section">
@@ -182,234 +294,1014 @@
     </div>
 
     <div class="panel-section">
+      <h3>Last Detection</h3>
+      <div class="metric"><span>Result</span><span class="val" id="det-result">—</span></div>
+      <div class="metric"><span>Expected</span><span class="val" id="det-expected">—</span></div>
+      <div class="metric"><span>Detected</span><span class="val" id="det-detected">—</span></div>
+      <div class="metric"><span>NHI</span><span class="val" id="det-nhi">—</span></div>
+      <div class="confidence-wrap"><div id="det-confidence-bar"></div></div>
+      <div id="det-candidates" style="margin-top:8px;display:none;">
+        <div style="font-size:10px;color:#556;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:4px;">Top Candidates</div>
+        <div id="det-candidates-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+      </div>
+    </div>
+
+    <!-- ── Test Detect panel (demo / dataset testing) ── -->
+    <div class="panel-section">
+      <h3>🧪 Test Detect</h3>
+
+      <!-- Slot selector -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <label style="font-size:11px;color:#778;white-space:nowrap;">Slot</label>
+        <select id="test-slot" style="
+          flex:1; background:#111a2e; color:#e0e8ff; border:1px solid #334;
+          border-radius:6px; padding:4px 8px; font-size:12px;">
+          <option value="1">1</option><option value="2">2</option>
+          <option value="3">3</option><option value="4">4</option>
+          <option value="5">5</option><option value="6">6</option>
+        </select>
+      </div>
+
+      <!-- Upload any file -->
+      <label style="
+        display:block; text-align:center; cursor:pointer; padding:10px;
+        border:2px dashed #334; border-radius:8px; font-size:12px; color:#778;
+        transition:border-color 0.2s;" id="test-drop-zone">
+        <input type="file" id="test-file-input" accept="image/*"
+               style="display:none;">
+        📂 Drop image or click to upload
+      </label>
+      <div id="test-preview-wrap" style="display:none;margin-top:6px;">
+        <img id="test-preview" style="
+          width:100%;border-radius:6px;border:1px solid #334;max-height:120px;
+          object-fit:contain;">
+        <button id="test-run-btn" style="
+          width:100%;margin-top:6px;padding:8px;background:#1e3a5f;
+          border:1px solid #7eb8ff55;border-radius:6px;color:#7eb8ff;
+          font-size:12px;cursor:pointer;">▶ Run Detection</button>
+      </div>
+
+      <!-- Dataset quick-pick -->
+      <div style="margin-top:10px;">
+        <div style="font-size:11px;color:#556;margin-bottom:6px;letter-spacing:0.5px;">
+          EPILLID DATASET SAMPLES
+        </div>
+        <div id="dataset-grid" style="
+          display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+          max-height:160px;overflow-y:auto;">
+          <div style="font-size:10px;color:#445;padding:4px;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Result badge -->
+      <div id="test-result-badge" style="display:none;margin-top:8px;
+        padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;
+        text-align:center;border:1px solid #334;"></div>
+    </div>
+
+    <div class="panel-section">
       <h3>Event Log</h3>
       <div class="event-log" id="event-log"></div>
     </div>
 
     <div class="panel-section">
-      <h3>Legend</h3>
-      <div id="legend">
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:#4db8ff88;border:1px solid #4db8ff;"></div>
-          Chamber shell
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:#f0f0f0cc;"></div>
-          Trapdoor
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:#ff884455;border:1px solid #ff8844;"></div>
-          Carousel
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:#ffdd44cc;"></div>
-          LED ring
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:#4cff8a88;border:1px solid #4cff8a;"></div>
-          Pill
-        </div>
+      <h3>Model Parts</h3>
+      <div id="parts-status" style="font-size:11px;color:#445;line-height:1.8;">
+        Waiting for GLB…
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- Three.js r158 from CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Three.js r128 + GLTFLoader (same version, registers on THREE global) -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
-// ─── Unit conversion: CAD is in inches, Three.js is unitless ───────────────
-// We use 1 unit = 1 inch for direct mapping, then scale the camera.
-const IN = 1.0;
+// ─── CAD coordinate mapping ────────────────────────────────────────────────────
+// CAD: X=left/right, Y=front/back, Z=up.  All in inches.
+// Three.js: Y=up.  So: threeX=cadX, threeY=cadZ, threeZ=cadY.
+// Pivot table uses Three.js coordinates.
 
-// ─── Scene setup ─────────────────────────────────────────────────────────────
-const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+// ─── Scene setup ──────────────────────────────────────────────────────────────
+const canvas   = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.outputEncoding    = THREE.sRGBEncoding;
 
-const scene = new THREE.Scene();
+const scene  = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0f1e);
-scene.fog = new THREE.FogExp2(0x0a0f1e, 0.025);
+scene.fog = new THREE.FogExp2(0x0a0f1e, 0.018);
 
-const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-camera.position.set(12, 18, 20);
-camera.lookAt(0, 7.5, 4.5);   // looking at carousel Y centre
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 500);
+// Camera position is set by fitCameraToModel() after the GLB loads
+camera.position.set(2, 2, 3);
+camera.lookAt(0, 0.5, 0);
 
-// Lighting
-const ambient = new THREE.AmbientLight(0x334466, 1.2);
-scene.add(ambient);
+// ─── Lighting ─────────────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x445566, 1.5));
 
-const key = new THREE.DirectionalLight(0x88aaff, 2.0);
-key.position.set(10, 20, 10);
-key.castShadow = true;
-key.shadow.mapSize.set(1024, 1024);
-scene.add(key);
+const keyLight = new THREE.DirectionalLight(0x88aaff, 2.2);
+keyLight.position.set(10, 22, 12);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+scene.add(keyLight);
 
-const fill = new THREE.PointLight(0x4488ff, 1.0, 40);
-fill.position.set(-8, 12, 8);
-scene.add(fill);
+const fillLight = new THREE.PointLight(0x4488ff, 1.2, 50);
+fillLight.position.set(-10, 14, 10);
+scene.add(fillLight);
 
-const ledGlow = new THREE.PointLight(0xffeeaa, 0, 6);   // LED ring glow — controlled by animation
+const rimLight = new THREE.PointLight(0x88ffcc, 0.6, 40);
+rimLight.position.set(5, 18, -8);
+scene.add(rimLight);
+
+// LED glow — intensity driven by state.ledIntensity.
+// Position is updated by fitCameraToModel() to sit near the chamber top.
+const ledGlow = new THREE.PointLight(0xffeeaa, 0, 2);
+ledGlow.position.set(0, 1.4, 0);
 scene.add(ledGlow);
 
-// ─── Materials ────────────────────────────────────────────────────────────────
-const mat = {
-  enclosure:  new THREE.MeshPhysicalMaterial({ color:0x2a3a5a, roughness:0.7, metalness:0.1, transparent:true, opacity:0.5, side: THREE.DoubleSide }),
-  chamber:    new THREE.MeshPhysicalMaterial({ color:0x4db8ff, roughness:0.2, metalness:0.0, transparent:true, opacity:0.35, side: THREE.DoubleSide }),
-  trapdoor:   new THREE.MeshStandardMaterial({ color:0xf0f0f0, roughness:0.9, metalness:0.0 }),
-  carousel:   new THREE.MeshStandardMaterial({ color:0x223344, roughness:0.6, metalness:0.3 }),
-  cartridge:  new THREE.MeshPhysicalMaterial({ color:0xff8844, roughness:0.3, transparent:true, opacity:0.6 }),
-  led:        new THREE.MeshStandardMaterial({ color:0xffeeaa, emissive:0xffcc44, emissiveIntensity:0.5 }),
-  pill:       new THREE.MeshPhysicalMaterial({ color:0x44ff88, roughness:0.3, metalness:0.0, transparent:true, opacity:0.0 }),
-  pillow:     new THREE.MeshStandardMaterial({ color:0x1a2f1a }),  // pill cup
-  wire:       new THREE.LineBasicMaterial({ color:0x334466 }),
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function cylinder(r, h, mat, segs=32) {
-  const g = new THREE.CylinderGeometry(r, r, h, segs);
-  return new THREE.Mesh(g, mat);
-}
-function box(w, h, d, mat) {
-  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-}
-function ring(rIn, rOut, h, mat, segs=32) {
-  const shape = new THREE.Shape();
-  shape.absarc(0,0,rOut,0,Math.PI*2,false);
-  const hole = new THREE.Path();
-  hole.absarc(0,0,rIn,0,Math.PI*2,true);
-  shape.holes.push(hole);
-  const g = new THREE.ExtrudeGeometry(shape, { depth:h, bevelEnabled:false });
-  const m = new THREE.Mesh(g, mat);
-  m.rotation.x = -Math.PI/2;
-  return m;
-}
-
-// ─── Build dispenser geometry ─────────────────────────────────────────────────
-// All positions in inches, matching optical_chamber.py / carousel.py constants.
-// World origin = enclosure floor, Z up, Y toward front.
-// Three.js: Y up → we swap: Three Y = CAD Z, Three Z = CAD Y, Three X = CAD X.
-function cadToThree(x, y, z) { return new THREE.Vector3(x, z, y); }
-
-const CAROUSEL_X = 0, CAROUSEL_Y = 4.5;
-const SLOT_R = 2.5;   // carousel slot radius from centre
-const N_SLOTS = 10;
-const CAROUSEL_Z_BASE = 4.9, CAROUSEL_H = 4.0;
-const CHBR_OUTER_R = 1.50, CHBR_INNER_R = 1.40, CHBR_Z_BOT = 12.90, CHBR_Z_TOP = 14.90;
-const HINGE_Z = 12.92;
-const CEIL_Z = 14.85;
-const LED_MAJOR_R = 1.30;
-
-// Enclosure shell (transparent box, 9×9×15")
-const enclosureShell = box(9, 15, 9, mat.enclosure);
-enclosureShell.position.set(0, 7.5, 4.5);
-enclosureShell.castShadow = false;
-scene.add(enclosureShell);
-
-// Enclosure floor reference
+// ─── Floor ────────────────────────────────────────────────────────────────────
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, 20),
-  new THREE.MeshStandardMaterial({ color:0x0d1525, roughness:1 })
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshStandardMaterial({ color: 0x0d1525, roughness: 1 })
 );
-floor.rotation.x = -Math.PI/2;
-floor.position.y = -0.02;
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.05;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Carousel base plate
-const carouselBase = ring(0.21, 3.45, 0.10, mat.carousel);
-carouselBase.position.set(CAROUSEL_X, CAROUSEL_Z_BASE, CAROUSEL_Y);
-scene.add(carouselBase);
+const N_SLOTS = 10;
 
-// Carousel disk (rotates)
-const carouselGroup = new THREE.Group();
-carouselGroup.position.set(CAROUSEL_X, CAROUSEL_Z_BASE + 0.10, CAROUSEL_Y);
-scene.add(carouselGroup);
+// ─── Virtual LCD Screen ───────────────────────────────────────────────────────
+// Canvas texture applied to the 'display_panel' mesh from the GLB.
+//
+// UV correction constants — Fusion 360 exports the face UVs rotated / mirrored.
+// If the image still looks wrong, try these alternatives:
+//   LCD_TEX_ROT:    0, Math.PI/2, Math.PI, -Math.PI/2
+//   LCD_TEX_FLIP_U: true → mirrors left/right
+//   LCD_TEX_FLIP_V: true → mirrors top/bottom
+// Square canvas — avoids aspect-ratio distortion when UV is rotated.
+const LCD_W = 512;
+const LCD_H = 512;
+// UV correction — determined by diagnostic mode below.
+// Flip the texture vertically to match Fusion 360's UV orientation.
+const LCD_TEX_ROT    = -Math.PI / 2;  // 90° CW — corrects Fusion 360 UV swap
+const LCD_TEX_FLIP_U = false;
+const LCD_TEX_FLIP_V = false;
+// Set true briefly to identify UV corner mapping; set false for production.
+const LCD_DIAGNOSTIC = false;
+// Fallback PlaneGeometry (used only if display_panel not found in GLB)
+const LCD_FACE   = 'min_z';
+const LCD_Y_FRAC = 0.70;
+const LCD_W_FRAC = 0.40;
 
-// 10 cartridge slots on carousel
-const cartridges = [];
-for (let i = 0; i < N_SLOTS; i++) {
-  const angle = (i / N_SLOTS) * Math.PI * 2;
-  const cx = Math.sin(angle) * SLOT_R;
-  const cy = Math.cos(angle) * SLOT_R;
-  const cart = cylinder(0.55, 3.9, mat.cartridge.clone());
-  cart.position.set(cx, 1.95, cy);
-  cart.castShadow = true;
-  carouselGroup.add(cart);
-  cartridges.push(cart);
+// Model bounding info — set once the GLB finishes loading.
+// Used by setZoneFrac() so transparency zones scale with any model size.
+let _modelHeight = 1;   // world-space Y height of the loaded model
+
+let lcdMesh    = null;
+let lcdCanvas  = null;
+let lcdCtx     = null;
+let lcdTexture = null;
+let _lcdQrImg  = null;   // /setup.png pre-loaded as an HTMLImageElement
+let _lcdDotTick = 0;     // cycles 0→3 for animated "..." on scanning page
+
+const lcdState = {
+  page:        'idle',   // 'idle' | 'paired' | 'pill_grid' | 'scanning' | 'result'
+  paired:      false,
+  serverIp:    '',
+  slots:       new Array(N_SLOTS).fill(false),
+  activeSlot:  null,
+  scanMedName: '',
+  lastResult:  null,     // { result, confidence, detectedName }
+  time:        '',
+};
+
+// Pre-fetch the setup QR image so it can be painted on the idle screen.
+function preloadQrImage() {
+  if (!_serverBase) return;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = _serverBase + '/setup.png?t=' + Date.now();
+  img.onload  = () => { _lcdQrImg = img; if (lcdState.page === 'idle') drawLcd(); };
+  img.onerror = () => {};
 }
 
-// Loading tube
-const loadTube = ring(1.80, 1.90, 3.90, new THREE.MeshPhysicalMaterial({
-  color:0x44ff88, roughness:0.1, transparent:true, opacity:0.2, side:THREE.DoubleSide
-}));
-loadTube.position.set(CAROUSEL_X, 11.00, CAROUSEL_Y);
-scene.add(loadTube);
+// ── UV remapper ───────────────────────────────────────────────────────────────
+// Fusion 360 often exports flat panel faces with degenerate UV coordinates
+// (all vertices at the same UV point) which causes the whole face to show a
+// single pixel of colour. This function rebuilds the UV attribute from the
+// mesh's local-space vertex positions, mapping the two "wide" axes (the face
+// plane) linearly to [0,1] × [0,1].
+//
+// The two constants at the top of the file (LCD_TEX_ROT / LCD_TEX_FLIP_U/V)
+// are then used to rotate / mirror the already-correct UV layout.
+function _remapPanelUvs(mesh) {
+  const geo = mesh.geometry;
 
-// Optical chamber shell
-const chamberMesh = ring(CHBR_INNER_R, CHBR_OUTER_R, 2.00, mat.chamber);
-chamberMesh.position.set(CAROUSEL_X, CHBR_Z_BOT, CAROUSEL_Y);
-scene.add(chamberMesh);
+  // Work in local space — no need to involve the world matrix here.
+  if (!geo.attributes.position) return;
+  geo.computeBoundingBox();
+  const bb  = geo.boundingBox;
+  const sz  = bb.getSize(new THREE.Vector3());          // [sx, sy, sz]
 
-// Trapdoor (two semicircle leaves, merge into one disc for simplicity)
-const tdGeo = new THREE.CylinderGeometry(1.40, 1.40, 0.04, 32);
-const trapdoor = new THREE.Mesh(tdGeo, mat.trapdoor);
-trapdoor.position.set(CAROUSEL_X, HINGE_Z, CAROUSEL_Y);
-scene.add(trapdoor);
+  // The axis with the smallest extent is the panel normal — ignore it for UV.
+  const axes = [
+    { idx: 0, extent: sz.x },
+    { idx: 1, extent: sz.y },
+    { idx: 2, extent: sz.z },
+  ].sort((a, b) => b.extent - a.extent);   // largest first
 
-// Trapdoor left/right leaves (for split animation)
-const tdLeftGeo = new THREE.CylinderGeometry(1.40, 1.40, 0.04, 32, 1, false, 0, Math.PI);
-const tdLeft  = new THREE.Mesh(tdLeftGeo,  mat.trapdoor);
-const tdRight = new THREE.Mesh(tdLeftGeo.clone(), mat.trapdoor);
-tdLeft.position.set(CAROUSEL_X, HINGE_Z, CAROUSEL_Y);
-tdRight.position.set(CAROUSEL_X, HINGE_Z, CAROUSEL_Y);
-tdLeft.rotation.y  = 0;
-tdRight.rotation.y = Math.PI;
-const tdGroup = new THREE.Group();
-tdGroup.add(tdLeft);
-tdGroup.add(tdRight);
-scene.add(tdGroup);
-trapdoor.visible = false;  // use individual leaves
+  const uAxisIdx = axes[0].idx;   // widest  → U
+  const vAxisIdx = axes[1].idx;   // tallest → V
+  const uMin = bb.min.getComponent(uAxisIdx);
+  const uMax = bb.max.getComponent(uAxisIdx);
+  const vMin = bb.min.getComponent(vAxisIdx);
+  const vMax = bb.max.getComponent(vAxisIdx);
+  const uRange = uMax - uMin || 1;
+  const vRange = vMax - vMin || 1;
 
-// Ceiling plate
-const ceiling = ring(0.60, CHBR_INNER_R, 0.05, new THREE.MeshPhysicalMaterial({
-  color:0xccffdd, roughness:0.2, transparent:true, opacity:0.5
-}));
-ceiling.position.set(CAROUSEL_X, CEIL_Z, CAROUSEL_Y);
-scene.add(ceiling);
+  const pos   = geo.attributes.position.array;
+  const count = geo.attributes.position.count;
 
-// LED ring
-const ledRingGeo = new THREE.TorusGeometry(LED_MAJOR_R, 0.05, 8, 32);
-const ledRingMesh = new THREE.Mesh(ledRingGeo, mat.led.clone());
-ledRingMesh.position.set(CAROUSEL_X, CEIL_Z, CAROUSEL_Y);
-ledRingMesh.rotation.x = Math.PI/2;
-scene.add(ledRingMesh);
+  // Create (or reuse) the UV attribute
+  let uvArr;
+  if (geo.attributes.uv) {
+    uvArr = geo.attributes.uv.array;
+  } else {
+    uvArr = new Float32Array(count * 2);
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
+  }
 
-// Camera mount (small box on -X side)
-const camMount = box(0.30, 0.30, 0.40, new THREE.MeshStandardMaterial({color:0x111111}));
-camMount.position.set(-1.65, 14.42, CAROUSEL_Y);
-camMount.rotation.z = Math.PI/4;  // 45° tilt
-scene.add(camMount);
+  for (let i = 0; i < count; i++) {
+    const pu = pos[i * 3 + uAxisIdx];
+    const pv = pos[i * 3 + vAxisIdx];
+    uvArr[i * 2 + 0] = (pu - uMin) / uRange;   // U ∈ [0,1]
+    uvArr[i * 2 + 1] = (pv - vMin) / vRange;   // V ∈ [0,1]
+  }
 
-// Pill (starts invisible, animated during detection)
-// CapsuleGeometry was added in Three.js r140; r128 doesn't have it, so fall back to a sphere.
-const pillGeo = (typeof THREE.CapsuleGeometry === 'function')
-  ? new THREE.CapsuleGeometry(0.18, 0.35, 4, 16)
-  : new THREE.SphereGeometry(0.22, 16, 12);
-const pillMesh = new THREE.Mesh(pillGeo, mat.pill);
-pillMesh.position.set(CAROUSEL_X, HINGE_Z + 0.5, CAROUSEL_Y);
+  geo.attributes.uv.needsUpdate = true;
+  console.log(`[lcd] UV remapped: U=axis${uAxisIdx}(${uMin.toFixed(3)}…${uMax.toFixed(3)})  V=axis${vAxisIdx}(${vMin.toFixed(3)}…${vMax.toFixed(3)})`);
+}
+
+function initLcd(modelBbox, modelSize) {
+  // Create the off-screen canvas that becomes the texture.
+  lcdCanvas = document.createElement('canvas');
+  lcdCanvas.width  = LCD_W;
+  lcdCanvas.height = LCD_H;
+  lcdCtx = lcdCanvas.getContext('2d');
+  lcdTexture = new THREE.CanvasTexture(lcdCanvas);
+
+  // UV correction for Fusion 360's face UV layout
+  lcdTexture.center.set(0.5, 0.5);
+  lcdTexture.rotation = LCD_TEX_ROT;
+  lcdTexture.repeat.set(LCD_TEX_FLIP_U ? -1 : 1, LCD_TEX_FLIP_V ? -1 : 1);
+
+  // ── Find the display_panel part ──────────────────────────────────────────
+  // Fusion 360 may export parts as Groups (not direct Meshes) and often
+  // appends ":1", ":2", etc. We strip those suffixes when matching.
+  let panelObj = null;
+  if (MODEL_INFO.root) {
+    MODEL_INFO.root.traverse(o => {
+      if (panelObj) return;
+      const base = (o.name || '').replace(/:\d+$/, '').toLowerCase().replace(/\s+/g, '_');
+      if (base === 'display_panel') panelObj = o;
+    });
+    // Fallback: any object whose stripped name contains 'display'
+    if (!panelObj) {
+      MODEL_INFO.root.traverse(o => {
+        if (panelObj) return;
+        const base = (o.name || '').replace(/:\d+$/, '').toLowerCase();
+        if (base.includes('display') || base.includes('screen') || base.includes('lcd')) panelObj = o;
+      });
+    }
+  }
+
+  if (panelObj) {
+    console.log('[lcd] Found panel object:', panelObj.name, '  type:', panelObj.type);
+
+    // Collect meshes (direct mesh or children of a group)
+    const panelMeshes = [];
+    if (panelObj.isMesh) {
+      panelMeshes.push(panelObj);
+    } else {
+      panelObj.traverse(o => { if (o.isMesh) panelMeshes.push(o); });
+    }
+
+    if (panelMeshes.length === 0) {
+      console.warn('[lcd] Panel group has no child meshes; using plane fallback.');
+      panelObj = null;
+    } else {
+      // ── Remap UVs for every panel mesh ──────────────────────────────────────
+      // Fusion 360 often exports flat faces with degenerate UVs (all vertices
+      // collapsed to the same UV coordinate). We rebuild UVs from the panel's
+      // local geometry: find the two axes with the largest extent (the face
+      // plane), then linearly map positions within that bounding box to [0,1].
+      panelObj.updateMatrixWorld(true);
+
+      panelMeshes.forEach(mesh => {
+        _remapPanelUvs(mesh);
+        mesh.material = new THREE.MeshBasicMaterial({ map: lcdTexture, side: THREE.DoubleSide });
+      });
+
+      lcdMesh = panelMeshes[0];
+      console.log('[lcd] Applied texture + remapped UVs on', panelMeshes.length, 'mesh(es).');
+
+      // Log bounding box for reference
+      const pb = new THREE.Box3().setFromObject(panelObj);
+      const pc = pb.getCenter(new THREE.Vector3());
+      const ps = pb.getSize(new THREE.Vector3());
+      console.log(`[lcd] Panel bbox center=(${pc.x.toFixed(3)},${pc.y.toFixed(3)},${pc.z.toFixed(3)})  size=(${ps.x.toFixed(3)},${ps.y.toFixed(3)},${ps.z.toFixed(3)})`);
+    }
+  }
+
+  if (!panelObj) {
+    // ── Fallback: PlaneGeometry on the front face (min_z) ──────────────────
+    console.log('[lcd] No display_panel found — adding PlaneGeometry on front face (min_z).');
+    const sw = modelSize.x * LCD_W_FRAC;
+    const sh = sw * (LCD_H / LCD_W);
+    const geo = new THREE.PlaneGeometry(sw, sh);
+    const mat = new THREE.MeshBasicMaterial({ map: lcdTexture, side: THREE.FrontSide });
+    lcdMesh = new THREE.Mesh(geo, mat);
+
+    const cx    = modelBbox.getCenter(new THREE.Vector3()).x;
+    // Use min_z (front face) — max_z is the back of this model
+    const faceZ = modelBbox.min.z - 0.004;
+    lcdMesh.position.set(cx, modelSize.y * LCD_Y_FRAC, faceZ);
+    lcdMesh.rotation.y = Math.PI;   // face outward toward the viewer
+    scene.add(lcdMesh);
+    console.log(`[lcd] Plane fallback → pos=(${cx.toFixed(2)}, ${(modelSize.y*LCD_Y_FRAC).toFixed(2)}, ${faceZ.toFixed(2)})  size=${sw.toFixed(2)}×${sh.toFixed(2)}`);
+  }
+
+  // Clock ticks every second — redraws idle/paired pages.
+  setInterval(() => {
+    lcdState.time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+    if (lcdState.page === 'idle' || lcdState.page === 'paired' || lcdState.page === 'pill_grid') drawLcd();
+  }, 1000);
+
+  // Animated scanning dots.
+  setInterval(() => {
+    _lcdDotTick = (_lcdDotTick + 1) % 4;
+    if (lcdState.page === 'scanning') drawLcd();
+  }, 400);
+
+  drawLcd();
+}
+
+// ── Canvas draw dispatcher ────────────────────────────────────────────────────
+function drawLcd() {
+  if (!lcdCtx || !lcdTexture) return;
+  const ctx = lcdCtx, W = LCD_W, H = LCD_H;
+
+  if (LCD_DIAGNOSTIC) {
+    // ── Diagnostic mode: shows which canvas corner maps to which panel corner ──
+    // Look at the panel on screen and note which colour appears in each corner.
+    // Tell the developer and they will apply the correct UV transform.
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#ff2222'; ctx.fillRect(0,       0,       W/2, H/2); // canvas TL = RED
+    ctx.fillStyle = '#22ff22'; ctx.fillRect(W/2,     0,       W/2, H/2); // canvas TR = GREEN
+    ctx.fillStyle = '#2222ff'; ctx.fillRect(0,       H/2,     W/2, H/2); // canvas BL = BLUE
+    ctx.fillStyle = '#ffff00'; ctx.fillRect(W/2,     H/2,     W/2, H/2); // canvas BR = YELLOW
+    ctx.font = 'bold 48px monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('TL', W/4,   H/4   + 16);
+    ctx.fillText('TR', 3*W/4, H/4   + 16);
+    ctx.fillText('BL', W/4,   3*H/4 + 16);
+    ctx.fillText('BR', 3*W/4, 3*H/4 + 16);
+    lcdTexture.needsUpdate = true;
+    return;
+  }
+
+  // Base dark background
+  ctx.fillStyle = '#001205';
+  ctx.fillRect(0, 0, W, H);
+
+  // Scanline overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 2);
+
+  // Border frame
+  ctx.strokeStyle = '#00ff6633';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
+
+  // Brand watermark
+  ctx.fillStyle = '#00aa5566';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('HERO', 12, 20);
+
+  switch (lcdState.page) {
+    case 'idle':      _lcdIdle(ctx, W, H);     break;
+    case 'paired':    _lcdPaired(ctx, W, H);   break;
+    case 'pill_grid': _lcdGrid(ctx, W, H);     break;
+    case 'scanning':  _lcdScanning(ctx, W, H); break;
+    case 'result':    _lcdResult(ctx, W, H);   break;
+  }
+
+  lcdTexture.needsUpdate = true;
+}
+
+// Helper: radial glow blot
+function _lcdGlow(ctx, x, y, r, color) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color); g.addColorStop(1, 'transparent');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+
+// ── Page: IDLE (waiting for app pair) ────────────────────────────────────────
+// Square 512×512 canvas layout
+function _lcdIdle(ctx, W, H) {
+  const qPad = 40;
+  const qSize = W - qPad * 2;
+  const qx = qPad, qy = qPad;
+
+  if (_lcdQrImg) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(qx - 6, qy - 6, qSize + 12, qSize + 12);
+    ctx.drawImage(_lcdQrImg, qx, qy, qSize, qSize);
+  } else {
+    ctx.strokeStyle = '#00ff4444'; ctx.lineWidth = 1;
+    const cell = 28;
+    for (let r = 0; r <= qSize; r += cell) { ctx.beginPath(); ctx.moveTo(qx, qy+r); ctx.lineTo(qx+qSize, qy+r); ctx.stroke(); }
+    for (let c = 0; c <= qSize; c += cell) { ctx.beginPath(); ctx.moveTo(qx+c, qy); ctx.lineTo(qx+c, qy+qSize); ctx.stroke(); }
+    ctx.fillStyle = '#00ff44'; ctx.font = 'bold 28px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('QR CODE', W/2, H/2 + 10);
+  }
+
+  ctx.fillStyle = '#00ff88';
+  ctx.font = 'bold 28px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('SCAN TO PAIR', W/2, H - 20);
+
+  if (Math.floor(Date.now() / 520) % 2 === 0) {
+    ctx.fillStyle = '#00ff44';
+    ctx.fillRect(W/2 - 6, H - 12, 12, 4);
+  }
+}
+
+// ── Page: PAIRED / IDLE (connected, awaiting prescription) ───────────────────
+function _lcdPaired(ctx, W, H) {
+  ctx.fillStyle = '#00ff88'; ctx.font = 'bold 28px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('SMART DISPENSER', W/2, 60);
+
+  _lcdGlow(ctx, W/2, H/2, 140, '#00ff4420');
+  ctx.fillStyle = '#00ff88'; ctx.font = 'bold 200px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('✓', W/2, H/2 + 70);
+
+  ctx.fillStyle = '#00cc66'; ctx.font = '22px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(lcdState.serverIp || 'CONNECTED', W/2, H - 52);
+  ctx.fillStyle = '#008844'; ctx.font = '20px monospace';
+  ctx.fillText(lcdState.time, W/2, H - 22);
+}
+
+// ── Page: PILL GRID (prescription loaded, shows slot fill status) ─────────────
+function _lcdGrid(ctx, W, H) {
+  ctx.fillStyle = '#00ff88'; ctx.font = 'bold 24px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('CAROUSEL STATUS', W/2, 36);
+
+  // 5 cols × 2 rows
+  const cols = 5, rows = 2;
+  const pad = 16;
+  const cw = Math.floor((W - pad*2) / cols);
+  const ch = Math.floor((H - 100) / rows);
+  const gx = pad, gy = 56;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const idx    = row * cols + col;
+      const x = gx + col * cw, y = gy + row * ch;
+      const filled = lcdState.slots[idx];
+      const active = lcdState.activeSlot === idx + 1;
+
+      ctx.fillStyle = active ? '#1a2a00' : (filled ? '#002a10' : '#000d05');
+      ctx.fillRect(x+3, y+3, cw-6, ch-6);
+
+      ctx.strokeStyle = active ? '#aaff00' : (filled ? '#00ff66' : '#004422');
+      ctx.lineWidth = active ? 3 : 1.5;
+      ctx.strokeRect(x+3, y+3, cw-6, ch-6);
+
+      if (filled || active) _lcdGlow(ctx, x+cw/2, y+ch/2, 40, active ? '#aaff0018' : '#00ff4415');
+
+      ctx.fillStyle = active ? '#aaff00' : (filled ? '#00ff88' : '#005533');
+      ctx.font = `bold ${active ? 32 : 28}px monospace`; ctx.textAlign = 'center';
+      ctx.fillText(idx + 1, x + cw/2, y + ch/2 + 11);
+
+      if (filled) {
+        ctx.fillStyle = '#00ff66';
+        ctx.beginPath(); ctx.arc(x + cw - 14, y + 16, 5, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+
+  const nFilled = lcdState.slots.filter(Boolean).length;
+  ctx.fillStyle = '#008855'; ctx.font = '18px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`${nFilled}/${N_SLOTS} LOADED  ·  ${lcdState.time}`, W/2, H - 12);
+}
+
+// ── Page: SCANNING (AI detection in progress) ─────────────────────────────────
+function _lcdScanning(ctx, W, H) {
+  const dots = '.'.repeat(_lcdDotTick);
+  _lcdGlow(ctx, W/2, H/2, 200, '#aaff0010');
+
+  const swY = (Date.now() % 1200) / 1200 * H;
+  ctx.fillStyle = 'rgba(170,255,0,0.10)';
+  ctx.fillRect(0, swY - 20, W, 40);
+
+  ctx.fillStyle = '#aaff00'; ctx.font = 'bold 52px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('SCANNING' + dots, W/2, H/2 - 40);
+  ctx.fillStyle = '#88cc00'; ctx.font = 'bold 36px monospace';
+  ctx.fillText('SLOT ' + (lcdState.activeSlot || '?'), W/2, H/2 + 20);
+
+  if (lcdState.scanMedName) {
+    ctx.fillStyle = '#668800'; ctx.font = '24px monospace';
+    const name = lcdState.scanMedName.length > 18 ? lcdState.scanMedName.slice(0, 16) + '…' : lcdState.scanMedName;
+    ctx.fillText(name, W/2, H/2 + 70);
+  }
+}
+
+// ── Page: RESULT (detection outcome) ─────────────────────────────────────────
+function _lcdResult(ctx, W, H) {
+  if (!lcdState.lastResult) return;
+  const { result, confidence, detectedName } = lcdState.lastResult;
+  const r = (result || '').toUpperCase();
+  const color = r === 'MATCH' ? '#00ff88' : r === 'UNSURE' ? '#ffdd00' : '#ff4422';
+  const emoji = r === 'MATCH' ? '✓' : r === 'UNSURE' ? '?' : '✗';
+  const label = r === 'MATCH' ? 'MATCH' : r === 'UNSURE' ? 'UNSURE' : 'NO MATCH';
+
+  _lcdGlow(ctx, W/2, H/2, 200, color + '18');
+  ctx.fillStyle = color; ctx.font = 'bold 200px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(emoji, W/2, H/2 + 70);
+  ctx.font = 'bold 44px monospace';
+  ctx.fillText(label, W/2, H/2 - 80);
+
+  if (detectedName) {
+    ctx.fillStyle = color + 'bb'; ctx.font = '22px monospace';
+    const name = detectedName.length > 20 ? detectedName.slice(0, 18) + '…' : detectedName;
+    ctx.fillText(name + '  ' + Math.round((confidence || 0) * 100) + '%', W/2, H - 22);
+  }
+}
+
+// ── LCD state-update helpers (called from handleEvent & updateConnection) ─────
+function lcdShowPage(page) { lcdState.page = page; drawLcd(); }
+
+function lcdOnConnected(ip) {
+  lcdState.paired    = true;
+  lcdState.serverIp  = ip || '';
+  lcdShowPage(lcdState.slots.some(Boolean) ? 'pill_grid' : 'paired');
+}
+
+function lcdOnDisconnected() {
+  lcdState.paired = false;
+  lcdShowPage('idle');
+}
+
+function lcdOnPrescription(slots) {
+  lcdState.slots = new Array(N_SLOTS).fill(false);
+  if (slots) slots.forEach(s => { const i = parseInt(s) - 1; if (i >= 0 && i < N_SLOTS) lcdState.slots[i] = false; });
+  lcdShowPage('pill_grid');
+}
+
+function lcdOnPillLoaded(slot) {
+  const i = parseInt(slot) - 1;
+  if (i >= 0 && i < N_SLOTS) lcdState.slots[i] = true;
+  lcdState.activeSlot = parseInt(slot);
+  drawLcd();
+}
+
+function lcdOnScanStart(slot, medName) {
+  lcdState.activeSlot  = parseInt(slot) || null;
+  lcdState.scanMedName = medName || '';
+  lcdShowPage('scanning');
+}
+
+function lcdOnDetectionResult(data) {
+  lcdState.lastResult = {
+    result:        data.result,
+    confidence:    data.confidence,
+    detectedName:  data.detected_name || data.med_name || '',
+  };
+  lcdShowPage('result');
+  // Auto-return to grid (or paired) after 3 s
+  setTimeout(() => {
+    if (lcdState.page === 'result') lcdShowPage(lcdState.slots.some(Boolean) ? 'pill_grid' : 'paired');
+  }, 3000);
+}
+
+function lcdOnDispense(slot) {
+  const i = parseInt(slot) - 1;
+  if (i >= 0 && i < N_SLOTS) lcdState.slots[i] = false;
+  lcdState.activeSlot = parseInt(slot);
+  if (lcdState.page === 'pill_grid') drawLcd();
+}
+
+// ─── Structural parts (toggle transparent during the matching stage) ─────────
+// Each entry holds the meshes that make up that named structural component
+// plus their original opacity values, so we can restore them after the stage.
+const STRUCTURE = {};
+const STRUCTURE_NAMES = [
+  'chamber_ceiling', 'routing_chute', 'pill_chute', 'pill_cup', 'loading_tube',
+  'cartridge_00','cartridge_01','cartridge_02','cartridge_03','cartridge_04',
+  'cartridge_05','cartridge_06','cartridge_07','cartridge_08','cartridge_09',
+];
+
+function collectStructure(root) {
+  root.traverse(obj => {
+    if (!obj.name) return;
+    // Match name with optional ":1" suffix Fusion sometimes adds
+    const baseName = obj.name.replace(/:\d+$/, '');
+    if (!STRUCTURE_NAMES.includes(baseName)) return;
+    if (!STRUCTURE[baseName]) STRUCTURE[baseName] = { meshes: [], originalOpacities: [] };
+    obj.traverse(child => {
+      if (!child.isMesh) return;
+      // Clone material so opacity changes here don't affect other parts
+      child.material = child.material.clone();
+      STRUCTURE[baseName].meshes.push(child);
+      STRUCTURE[baseName].originalOpacities.push(child.material.opacity);
+    });
+  });
+  console.log('[viewer] Structure parts collected:', Object.keys(STRUCTURE).map(n => `${n}(${STRUCTURE[n].meshes.length})`).join(', '));
+}
+
+function setTransparent(name, alpha = 0.18) {
+  const s = STRUCTURE[name];
+  if (!s) { console.warn('[viewer] no structure named', name); return; }
+  for (const m of s.meshes) {
+    m.material.transparent = true;
+    m.material.opacity     = alpha;
+    m.material.depthWrite  = false;
+    m.material.needsUpdate = true;
+  }
+}
+
+function restoreOpacity(name) {
+  const s = STRUCTURE[name];
+  if (!s) return;
+  s.meshes.forEach((m, i) => {
+    const o = s.originalOpacities[i];
+    m.material.opacity     = o;
+    m.material.transparent = o < 1;
+    m.material.depthWrite  = o >= 1;
+    m.material.needsUpdate = true;
+  });
+}
+
+function restoreAllStructure() {
+  for (const name of Object.keys(STRUCTURE)) restoreOpacity(name);
+}
+
+// ─── Body zone transparency (cutaway view by Y-range) ─────────────────────────
+// The dispenser body is made of dozens of "Body1.NNN" enclosure pieces. To
+// reveal the pill flow inside, we mark each opaque body mesh's Y-range and
+// can selectively make any subset transparent based on the active stage.
+const BODY_MESHES = [];   // [{ mesh, yMin, yMax, originalOpacity }]
+
+function collectBodyMeshes(root) {
+  root.traverse(obj => {
+    if (!obj.isMesh) return;
+    // Skip parts already managed via STRUCTURE or PARTS
+    const baseName = (obj.name || '').replace(/:\d+$/, '');
+    const parentName = (obj.parent?.name || '').replace(/:\d+$/, '');
+    if (STRUCTURE_NAMES.includes(baseName) || STRUCTURE_NAMES.includes(parentName)) return;
+    if (PART_SPEC[baseName] || PART_SPEC[parentName]) return;
+    // Never make the LCD panel transparent — it's always foreground UI
+    if (baseName === 'display_panel' || parentName === 'display_panel') return;
+    // Compute world Y-range
+    const bbox = new THREE.Box3().setFromObject(obj);
+    if (bbox.isEmpty()) return;
+    // Clone material so we can change opacity independently
+    obj.material = obj.material.clone();
+    BODY_MESHES.push({
+      mesh: obj,
+      yMin: bbox.min.y,
+      yMax: bbox.max.y,
+      originalOpacity: obj.material.opacity,
+    });
+  });
+  console.log(`[viewer] BODY_MESHES collected: ${BODY_MESHES.length}`);
+}
+
+// Make all body meshes overlapping the [yMin, yMax] band transparent
+function setZoneTransparent(yMin, yMax, alpha = 0.12) {
+  for (const b of BODY_MESHES) {
+    if (b.yMax >= yMin && b.yMin <= yMax) {
+      b.mesh.material.transparent = true;
+      b.mesh.material.opacity     = alpha;
+      b.mesh.material.depthWrite  = false;
+      b.mesh.material.needsUpdate = true;
+    }
+  }
+}
+
+function restoreAllZones() {
+  for (const b of BODY_MESHES) {
+    b.mesh.material.opacity     = b.originalOpacity;
+    b.mesh.material.transparent = b.originalOpacity < 1;
+    b.mesh.material.depthWrite  = b.originalOpacity >= 1;
+    b.mesh.material.needsUpdate = true;
+  }
+}
+
+// Fraction-based transparency: fracMin/fracMax are 0–1 proportions of the
+// total model height.  Use (0, 1) to make the entire enclosure transparent.
+function setZoneFrac(fracMin, fracMax, alpha = 0.12) {
+  setZoneTransparent(_modelHeight * fracMin, _modelHeight * fracMax, alpha);
+}
+
+function restoreAll() {
+  restoreAllStructure();
+  restoreAllZones();
+}
+
+// World-space center of a structural part's bounding box
+function getPartCenter(name) {
+  const s = STRUCTURE[name];
+  if (!s || !s.meshes.length) return new THREE.Vector3(0, 0, 0);
+  const bbox = new THREE.Box3();
+  for (const m of s.meshes) bbox.expandByObject(m);
+  return bbox.getCenter(new THREE.Vector3());
+}
+
+function getPartBottom(name) {
+  const s = STRUCTURE[name];
+  if (!s || !s.meshes.length) return new THREE.Vector3(0, 0, 0);
+  const bbox = new THREE.Box3();
+  for (const m of s.meshes) bbox.expandByObject(m);
+  return new THREE.Vector3((bbox.min.x + bbox.max.x)/2, bbox.min.y, (bbox.min.z + bbox.max.z)/2);
+}
+
+function getPartTop(name) {
+  const s = STRUCTURE[name];
+  if (!s || !s.meshes.length) return new THREE.Vector3(0, 0, 0);
+  const bbox = new THREE.Box3();
+  for (const m of s.meshes) bbox.expandByObject(m);
+  return new THREE.Vector3((bbox.min.x + bbox.max.x)/2, bbox.max.y, (bbox.min.z + bbox.max.z)/2);
+}
+
+// ─── Travelling pill mesh ─────────────────────────────────────────────────────
+// One sphere that follows the pill flow path. Visible only during a stage
+// where a pill is in motion (chamber → chute → slot, or slot → chute → cup).
+const pillMat = new THREE.MeshPhysicalMaterial({
+  color: 0xff5544, roughness: 0.2, metalness: 0.0,
+  emissive: 0xff3322, emissiveIntensity: 0.5,
+  transparent: true, opacity: 0,
+});
+const pillMesh = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 18), pillMat);
 pillMesh.castShadow = true;
 scene.add(pillMesh);
 
-// Pill cup (alcove)
-const pillCup = cylinder(0.60, 0.80, mat.pillow);
-pillCup.position.set(CAROUSEL_X, 0.40, CAROUSEL_Y + SLOT_R);
-scene.add(pillCup);
+const pill = {
+  pos: new THREE.Vector3(),
+  targetPos: new THREE.Vector3(),
+  opacity: 0,
+  targetOpacity: 0,
+  // Path waypoints for smooth flow (e.g. through chute)
+  waypoints: [],
+  waypointIdx: 0,
+};
 
-// ─── Slot UI grid (panel) ────────────────────────────────────────────────────
-const slotGrid = document.getElementById('slot-grid');
+function pillTo(worldPos, opacity = 1, snap = false) {
+  pill.targetPos.copy(worldPos);
+  pill.targetOpacity = opacity;
+  if (snap) { pill.pos.copy(worldPos); pill.opacity = opacity; }
+  pill.waypoints = [];
+}
+
+function pillFlowPath(positions, opacity = 1) {
+  // Set a series of waypoints; pill walks through them with lerp
+  pill.waypoints = positions.slice();
+  pill.waypointIdx = 0;
+  if (pill.waypoints.length) pill.targetPos.copy(pill.waypoints[0]);
+  pill.targetOpacity = opacity;
+}
+
+// ─── Named part registry ──────────────────────────────────────────────────────
+// Filled after GLB loads. Keeps the part inside its parent hierarchy so the
+// model stays assembled. We rotate around the part's bounding-box centre using
+// THREE.Object3D.attach() — this preserves the part's world transform.
+const PARTS = {};
+
+// Animated parts. Each entry describes:
+//   axis: which local axis to rotate around ('x', 'y', 'z')
+//   sign: +1 or -1 (handle mirrored parts)
+//   pivot: 'center' = rotate around bbox centre (good for carousel),
+//          'edge_min_y'/'edge_max_y'/'edge_min_x'/'edge_max_x' = hinge along
+//                                                                an outer edge
+const PART_SPEC = {
+  carousel:              { axis: 'y', sign: -1, pivot: 'center' },
+  hatch_final:           { axis: 'x', sign: -1, pivot: 'edge_max_z' },
+  trapdoor_left:         { axis: 'z', sign: +1, pivot: 'edge_min_x' },
+  trapdoor_right:        { axis: 'z', sign: -1, pivot: 'edge_max_x' },
+  dispense_gate:         { axis: 'x', sign: +1, pivot: 'edge_max_z' },
+  dispense_release_gate: { axis: 'x', sign: +1, pivot: 'edge_max_z' },
+  dispense_sweep_pusher: { axis: 'translate_z', sign: +1, pivot: 'center' },
+};
+
+// ─── Pivot wrapper (assembly-preserving) ─────────────────────────────────────
+// Wraps a part in a pivot Group at the requested hinge point WITHOUT removing
+// it from the model hierarchy. Uses Object3D.attach() which preserves world
+// transform. Returns the pivot Group.
+function wrapPivotInPlace(mesh, pivotMode) {
+  // Compute the world-space bounding box of this part
+  const bbox = new THREE.Box3().setFromObject(mesh);
+  const center = bbox.getCenter(new THREE.Vector3());
+  const min = bbox.min, max = bbox.max;
+
+  // Determine pivot point in world space
+  const pivot = center.clone();
+  switch (pivotMode) {
+    case 'edge_max_z': pivot.z = max.z; break;
+    case 'edge_min_z': pivot.z = min.z; break;
+    case 'edge_max_x': pivot.x = max.x; break;
+    case 'edge_min_x': pivot.x = min.x; break;
+    case 'edge_max_y': pivot.y = max.y; break;
+    case 'edge_min_y': pivot.y = min.y; break;
+  }
+
+  // Insert a Group between the mesh and its current parent.
+  // Group.position = pivot point in world space.
+  // mesh.attach(...) preserves world transform (mesh stays in place).
+  const parent = mesh.parent;
+  const group = new THREE.Group();
+  group.position.copy(pivot);
+  parent.add(group);
+  group.attach(mesh);
+  return group;
+}
+
+// ─── GLB loading ─────────────────────────────────────────────────────────────
+const MODEL_URL = '/model/hero_full_assembly.glb';
+
+// Computed at load time so other code can reference model dimensions
+let MODEL_INFO = { center: new THREE.Vector3(), size: new THREE.Vector3(), height: 1, root: null };
+
+function loadModel() {
+  const loader = new THREE.GLTFLoader();
+  loader.load(
+    MODEL_URL,
+
+    // ── onLoad ──────────────────────────────────────────────────────────────
+    function(gltf) {
+      const root = gltf.scene;
+
+      // Enable shadows on all loaded meshes
+      root.traverse(obj => {
+        if (obj.isMesh) {
+          obj.castShadow    = true;
+          obj.receiveShadow = true;
+        }
+      });
+
+      // ── Axis correction: Fusion 360 exports Z-up; Three.js is Y-up ────────
+      // Rotate -90° around X so the dispenser stands upright.
+      root.rotation.x = -Math.PI / 2;
+
+      scene.add(root);
+
+      // ── Compute model bounding box (after axis correction) ───────────────
+      root.updateMatrixWorld(true);
+      const bbox = new THREE.Box3().setFromObject(root);
+      const size = new THREE.Vector3(); bbox.getSize(size);
+      const center = new THREE.Vector3(); bbox.getCenter(center);
+      MODEL_INFO = { center, size, height: size.y, root };
+      console.log(`[viewer] Model bbox: size=(${size.x.toFixed(3)}, ${size.y.toFixed(3)}, ${size.z.toFixed(3)})  center=(${center.x.toFixed(3)}, ${center.y.toFixed(3)}, ${center.z.toFixed(3)})`);
+
+      // Dump all mesh names so we can identify a screen mesh if one exists
+      const meshNames = [];
+      root.traverse(o => { if (o.isMesh && o.name) meshNames.push(o.name); });
+      console.log('[viewer] All mesh names:', meshNames.join(', '));
+
+      // Sit the model on the floor (translate so bbox.min.y = 0)
+      root.position.y -= bbox.min.y;
+      root.updateMatrixWorld(true);
+
+      // Store real model height for fraction-based transparency zones
+      _modelHeight = size.y || 1;
+      console.log(`[viewer] Model height = ${_modelHeight.toFixed(3)} units`);
+
+      // ── Auto-fit camera to the model ──────────────────────────────────────
+      fitCameraToModel(size, center);
+
+      // ── Position LED glow inside the chamber (top-front of model) ─────────
+      ledGlow.position.set(center.x, size.y * 0.95, center.z);
+      ledGlow.distance = Math.max(size.x, size.z) * 1.2;
+
+      // ── Collect structural parts for transparency control ─────────────────
+      collectStructure(root);
+      collectBodyMeshes(root);
+
+      // Initialize pill at chamber position (hidden)
+      const startPos = getPartCenter('chamber_ceiling');
+      pill.pos.copy(startPos); pill.targetPos.copy(startPos);
+
+      // ── Collect named animated parts ──────────────────────────────────────
+      const expected = Object.keys(PART_SPEC);
+      root.traverse(obj => {
+        if (expected.includes(obj.name) && !PARTS[obj.name]) {
+          PARTS[obj.name] = { mesh: obj, group: null, spec: PART_SPEC[obj.name], baseRotation: 0, basePosition: 0 };
+        }
+      });
+
+      const found   = Object.keys(PARTS);
+      const missing = expected.filter(n => !PARTS[n]);
+      console.log('[viewer] GLB loaded. Animated parts found:', found);
+      if (missing.length) {
+        console.warn('[viewer] Missing animated parts:', missing);
+      }
+      updatePartsPanel(found, missing);
+
+      // ── Wrap each found part in an in-place pivot group ───────────────────
+      // Uses attach() so the model stays assembled at rest.
+      // IMPORTANT: must update world matrices BEFORE wrapping so bbox is correct.
+      root.updateMatrixWorld(true);
+      let wrapOk = 0, wrapFail = 0;
+      found.forEach(name => {
+        const entry = PARTS[name];
+        if (!entry.mesh.parent) {
+          console.warn(`[viewer] ${name} has no parent, skipping`);
+          wrapFail++;
+          return;
+        }
+        try {
+          entry.group = wrapPivotInPlace(entry.mesh, entry.spec.pivot);
+          if (entry.group) wrapOk++;
+          else { console.warn(`[viewer] ${name}: wrap returned null`); wrapFail++; }
+        } catch (e) {
+          console.warn(`[viewer] pivot wrap failed for ${name}:`, e.message, e);
+          wrapFail++;
+        }
+      });
+      console.log(`[viewer] Wrap result: ${wrapOk} ok, ${wrapFail} failed`);
+
+      // ── Initialise virtual LCD screen ─────────────────────────────────────
+      // Recompute bbox after floor adjustment so Z positions are correct.
+      root.updateMatrixWorld(true);
+      const finalBbox = new THREE.Box3().setFromObject(root);
+      initLcd(finalBbox, size);
+
+      // Hide loading overlay
+      document.getElementById('loading-overlay').classList.add('hidden');
+      logEvent('Fusion 360 model loaded — ' + found.length + ' animated parts', 'match');
+    },
+
+    // ── onProgress ──────────────────────────────────────────────────────────
+    function(xhr) {
+      if (xhr.lengthComputable) {
+        const pct = Math.round((xhr.loaded / xhr.total) * 100);
+        document.getElementById('loading-bar').style.width = pct + '%';
+        document.getElementById('loading-pct').textContent  = pct + '%';
+      }
+    },
+
+    // ── onError ─────────────────────────────────────────────────────────────
+    function(err) {
+      console.error('[viewer] GLB load error:', err);
+      const errEl = document.getElementById('loading-error');
+      errEl.textContent = 'Could not load model. Check that the server is running and the GLB file exists.';
+      errEl.style.display = 'block';
+      document.getElementById('loading-pct').textContent = 'Error';
+      document.getElementById('loading-title').textContent = 'Model not found';
+    }
+  );
+}
+
+// Auto-fit camera to fill the viewport with the model (with small margin).
+// Called once after the GLB loads. Re-aimed via orbit controls afterwards.
+function fitCameraToModel(size, center) {
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * Math.PI / 180;
+  const dist = (maxDim / 2) / Math.tan(fov / 2) * 1.6;   // 1.6 = margin
+
+  // Place camera at a 3/4 isometric angle above and in front of the model
+  orbitTarget.set(center.x, size.y * 0.45, center.z);
+  orbitRadius = dist;
+  spherical.theta = Math.PI * 0.25;     // 45° around vertical
+  spherical.phi   = Math.PI * 0.32;     // ~58° from vertical
+  updateCamera();
+
+  // Move floor under the model
+  floor.position.y = 0;
+
+  // Adjust fog so model doesn't fade out
+  scene.fog = new THREE.FogExp2(0x0a0f1e, 0.04 / maxDim);
+}
+
+function updatePartsPanel(found, missing) {
+  const el = document.getElementById('parts-status');
+  const lines = [];
+  const allParts = Object.keys(PART_SPEC);
+  allParts.forEach(name => {
+    const ok = found.includes(name);
+    lines.push(`<span style="color:${ok ? '#4cff8a' : '#ff6644'}">${ok ? '✓' : '✗'} ${name}</span>`);
+  });
+  el.innerHTML = lines.join('<br>');
+}
+
+// ─── Slot grid ────────────────────────────────────────────────────────────────
+const slotGrid  = document.getElementById('slot-grid');
 const slotCells = [];
 for (let i = 1; i <= N_SLOTS; i++) {
   const cell = document.createElement('div');
@@ -419,147 +1311,555 @@ for (let i = 1; i <= N_SLOTS; i++) {
   slotCells.push(cell);
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// ─── Animation state ──────────────────────────────────────────────────────────
 const state = {
-  status: 'idle',
-  detected: 0,
-  dispensed: 0,
+  // Connection / metrics
+  status:     'idle',
+  detected:   0,
+  dispensed:  0,
   activeSlot: null,
-  carouselAngle: 0,
+
+  // Carousel
+  carouselAngle:       0,
   targetCarouselAngle: 0,
-  trapdoorAngle: 0,         // 0=closed, PI/2=open
+
+  // Trapdoor leaves (both driven by single angle)
+  trapdoorAngle:       0,
   targetTrapdoorAngle: 0,
-  pillOpacity: 0,
-  targetPillOpacity: 0,
-  pillY: HINGE_Z + 0.5,
-  targetPillY: HINGE_Z + 0.5,
-  ledIntensity: 0,
+
+  // Hatch lid
+  hatchAngle:          0,
+  targetHatchAngle:    0,
+
+  // Dispense inlet gate (upper)
+  dispenseGateAngle:       0,
+  targetDispenseGateAngle: 0,
+
+  // Release gate (lower)
+  releaseGateAngle:        0,
+  targetReleaseGateAngle:  0,
+
+  // Sweep pusher (linear, along Three.js Z)
+  pusherZ:       0,
+  targetPusherZ: 0,
+
+  // LED glow
+  ledIntensity:       0,
   targetLedIntensity: 0,
-  dispensingPillY: null,
+
 };
 
-// ─── Animation helpers ────────────────────────────────────────────────────────
-function lerp(a, b, t) { return a + (b - a) * t; }
+// ─── Animation helpers ─────────────────────────────────────────────────────────
+function lerp(a, b, t)    { return a + (b - a) * t; }
 function shortAngle(a, b) {
   let d = b - a;
-  while (d > Math.PI)  d -= Math.PI * 2;
+  while (d >  Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   return d;
 }
-
 function slotAngle(slotNum) {
-  // Slot 1 at angle 0; slots increment clockwise
   return ((slotNum - 1) / N_SLOTS) * Math.PI * 2;
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
-function onDetectionMatch(event) {
+function onDetectionMatch(ev) {
   state.detected++;
   document.getElementById('m-detected').textContent = state.detected;
-  document.getElementById('m-conf').textContent =
-    ((event.confidence || 0) * 100).toFixed(0) + '%';
-
-  const slot = parseInt(event.slot) || 1;
+  document.getElementById('m-conf').textContent = ((ev.confidence || 0) * 100).toFixed(0) + '%';
+  const slot = parseInt(ev.slot) || 1;
   state.activeSlot = slot;
   document.getElementById('m-slot').textContent = slot;
-
-  if (slotCells[slot - 1]) {
-    slotCells.forEach(c => c.classList.remove('active'));
-    slotCells[slot - 1].classList.add('active');
-  }
-
-  // Animate: pill appears → LED on → trapdoor opens → carousel rotates
-  state.targetPillOpacity = 0.95;
-  state.targetLedIntensity = 3.0;
-  setTimeout(() => {
-    state.targetTrapdoorAngle = Math.PI / 2;  // open
-    // Rotate carousel to slot
-    const target = slotAngle(slot);
-    const delta = shortAngle(state.targetCarouselAngle, target);
-    state.targetCarouselAngle += delta;
-  }, 900);
-  setTimeout(() => {
-    state.targetPillY = CHBR_Z_BOT - 2;  // pill drops
-    state.targetPillOpacity = 0;
-  }, 1800);
-  setTimeout(() => {
-    state.targetTrapdoorAngle = 0;         // close
-    state.targetLedIntensity = 0;
-    state.targetPillY = HINGE_Z + 0.5;    // reset
-
-    if (slotCells[slot - 1]) {
-      slotCells[slot - 1].classList.remove('active');
-      slotCells[slot - 1].classList.add('filled');
-    }
-  }, 2600);
+  slotCells.forEach(c => c.classList.remove('active'));
+  if (slotCells[slot - 1]) slotCells[slot - 1].classList.add('active');
 }
 
-function onDispenseComplete(event) {
+function onDispenseComplete(ev) {
   state.dispensed++;
   document.getElementById('m-dispensed').textContent = state.dispensed;
-
-  const slot = parseInt(event.slot) || state.activeSlot || 1;
-  // Rotate to slot, then animate pill falling into cup
-  const target = slotAngle(slot);
-  const delta = shortAngle(state.targetCarouselAngle, target);
-  state.targetCarouselAngle += delta;
-
-  setTimeout(() => {
-    // Flash cartridge for that slot
-    if (cartridges[slot - 1]) {
-      const orig = cartridges[slot - 1].material.color.clone();
-      cartridges[slot - 1].material.color.set(0xffffff);
-      setTimeout(() => cartridges[slot - 1].material.color.copy(orig), 400);
-    }
-    if (slotCells[slot - 1]) {
-      slotCells[slot - 1].classList.remove('filled', 'active', 'dispensing');
-    }
-  }, 800);
+  const slot = parseInt(ev.slot) || state.activeSlot || 1;
+  const tgt  = slotAngle(slot);
+  state.targetCarouselAngle += shortAngle(state.targetCarouselAngle, tgt);
+  if (slotCells[slot - 1]) slotCells[slot - 1].classList.remove('filled', 'active', 'dispensing');
 }
 
-function onLoadingStarted(event) {
-  const slot = parseInt(event.slot) || 1;
+function onLoadingStarted(ev) {
+  const slot = parseInt(ev.slot) || 1;
   state.activeSlot = slot;
   document.getElementById('m-slot').textContent = slot;
-  // Rotate to loading slot
-  const target = slotAngle(slot);
-  const delta = shortAngle(state.targetCarouselAngle, target);
-  state.targetCarouselAngle += delta;
+  const tgt = slotAngle(slot);
+  state.targetCarouselAngle += shortAngle(state.targetCarouselAngle, tgt);
 }
 
 function onStatusChange(value) {
   state.status = value;
   document.getElementById('m-status').textContent = value;
-  const dot = document.getElementById('conn-dot');
-  const label = document.getElementById('conn-label');
-  dot.className = 'status-dot ' + value;
-  label.textContent = { idle:'Idle', imaging:'Imaging pill…',
-    dispensing:'Dispensing…', error:'Error' }[value] || value;
+}
+
+// ─── Medication overlay ───────────────────────────────────────────────────────
+function _showMedOverlay(name) {
+  document.getElementById('med-name-text').textContent = name;
+  document.getElementById('med-overlay').classList.add('visible');
+}
+function _hideMedOverlay() {
+  document.getElementById('med-overlay').classList.remove('visible');
 }
 
 // ─── Event log ────────────────────────────────────────────────────────────────
-function logEvent(text, type='status') {
-  const log = document.getElementById('event-log');
+function logEvent(text, type = 'status') {
+  const log  = document.getElementById('event-log');
   const item = document.createElement('div');
   item.className = `event-item ${type}`;
-  item.textContent = new Date().toLocaleTimeString('zh-TW', {hour12:false}) + '  ' + text;
+  item.textContent = new Date().toLocaleTimeString('zh-TW', { hour12: false }) + '  ' + text;
   log.prepend(item);
-  while (log.children.length > 20) log.removeChild(log.lastChild);
+  while (log.children.length > 24) log.removeChild(log.lastChild);
 }
 
-// ─── Polling connection (replaces SSE — works with any WSGI server) ──────────
-//
-// Every 500 ms the viewer calls GET /events/recent?since=<id>.
-// The server returns {status, events: [...], next_id} as plain JSON.
-// No streaming, no buffering problems, works on Windows with Waitress.
+function updateConnection(appConnected, serverReachable = true) {
+  const dot = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  if (!serverReachable) {
+    dot.className = 'status-dot';
+    label.textContent = 'Reconnecting…';
+    lcdOnDisconnected();
+  } else if (appConnected) {
+    dot.className = 'status-dot connected';
+    label.textContent = 'App connected';
+    if (!lcdState.paired) lcdOnConnected(_serverBase ? _serverBase.replace('http://', '') : '');
+  } else {
+    dot.className = 'status-dot server';
+    label.textContent = 'Server online · app not connected';
+    // Server is reachable but app not yet paired — stay on idle/paired as appropriate
+    if (!lcdState.paired && lcdState.page === 'idle') {
+      // already on idle, nothing to do
+    }
+  }
+}
 
+function resultColour(result) {
+  const r = (result || '').toUpperCase();
+  if (r === 'MATCH') return '#4cff8a';
+  if (r === 'UNSURE') return '#ffdd44';
+  return '#ff6644';
+}
+
+function resultHex(result) {
+  const r = (result || '').toUpperCase();
+  if (r === 'MATCH') return 0x44ff44;
+  if (r === 'UNSURE') return 0xffaa22;
+  return 0xff4422;
+}
+
+let _camHideTimer = null;
+function showCameraCapture(result = 'UNSURE', holdMs = 0) {
+  const panel = document.getElementById('cam-panel');
+  const img = document.getElementById('cam-feed');
+  panel.style.borderColor = resultColour(result);
+  panel.classList.add('visible');
+  if (_serverBase) img.src = _serverBase + '/recent_capture.jpg?t=' + Date.now();
+  if (_camHideTimer) clearTimeout(_camHideTimer);
+  if (holdMs > 0) {
+    _camHideTimer = setTimeout(() => panel.classList.remove('visible'), holdMs);
+  }
+}
+
+// ─── Centre-screen detection flash overlay ───────────────────────────────────
+let _flashHideTimer = null;
+function showDetectFlash(data, holdMs = 2500) {
+  const result  = (data.result || 'UNKNOWN').toUpperCase();
+  const conf    = Math.round((data.confidence || 0) * 100);
+  const name    = data.detected_name || data.med_name || '—';
+  const colour  = resultColour(result);
+
+  // Result label text + colour
+  const labelMap = { MATCH: '✅  MATCH', UNSURE: '⚠️  UNSURE', NO_MATCH: '❌  NO MATCH' };
+  const flashEl  = document.getElementById('detect-flash');
+  const resEl    = document.getElementById('df-result-text');
+  const nameEl   = document.getElementById('df-name-text');
+  const barEl    = document.getElementById('df-conf-bar');
+
+  resEl.textContent  = labelMap[result] || result;
+  resEl.style.color  = colour;
+  nameEl.textContent = name + '  ' + conf + '%';
+  barEl.style.background = colour;
+  flashEl.style.borderColor = colour;
+
+  // Animate confidence bar: reset to 0 then transition to real value
+  barEl.style.width = '0%';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { barEl.style.width = conf + '%'; });
+  });
+
+  // Show overlay
+  flashEl.classList.add('visible');
+  if (_flashHideTimer) clearTimeout(_flashHideTimer);
+  _flashHideTimer = setTimeout(() => flashEl.classList.remove('visible'), holdMs);
+}
+
+function updateDetectionPanel(data) {
+  const result = (data.result || 'UNKNOWN').toUpperCase();
+  const colour = resultColour(result);
+  const conf = Math.round((data.confidence || 0) * 100);
+  document.getElementById('det-result').textContent = result + ' ' + conf + '%';
+  document.getElementById('det-result').style.color = colour;
+  document.getElementById('det-expected').textContent = data.expected_name || '—';
+  document.getElementById('det-detected').textContent = data.detected_name || data.med_name || '—';
+  document.getElementById('det-nhi').textContent = data.detected_nhi || '—';
+  const bar = document.getElementById('det-confidence-bar');
+  bar.style.width = Math.max(0, Math.min(100, conf)) + '%';
+  bar.style.background = colour;
+
+  // Top-3 candidates
+  const candidates = data.top_candidates || [];
+  const wrap = document.getElementById('det-candidates');
+  const list = document.getElementById('det-candidates-list');
+  if (candidates.length > 0) {
+    list.innerHTML = candidates.map((c, i) => {
+      const pct = Math.round((c.score || 0) * 100);
+      const rank = ['①','②','③'][i] || (i+1)+'.';
+      return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+        <span style="color:#556;min-width:18px;">${rank}</span>
+        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#a0b8e0;">${c.name || c.nhi_code || '?'}</span>
+        <span style="color:${i===0 ? colour : '#556'};font-weight:${i===0?'bold':'normal'};min-width:36px;text-align:right;">${pct}%</span>
+      </div>`;
+    }).join('');
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+// ─── Main event dispatcher ────────────────────────────────────────────────────
+function handleEvent(data) {
+  const ev = data.event || '';
+  switch (ev) {
+
+    // ── Server/app events ────────────────────────────────────────────────────
+    case 'status':
+      onStatusChange(data.value || 'idle'); break;
+
+    case 'detection_result':
+      if (data.result === 'MATCH') {
+        onDetectionMatch(data);
+        logEvent('MATCH  slot ' + data.slot + '  ' + ((data.confidence||0)*100).toFixed(0) + '%', 'match');
+      } else if (data.result === 'UNSURE') {
+        logEvent('UNSURE  slot ' + data.slot, 'unsure');
+      } else {
+        logEvent('NO_MATCH', 'status');
+      }
+      break;
+
+    case 'detection_started': {
+      state.targetLedIntensity = 3.0;
+      ledGlow.color.setHex(0xffdd44);
+      showCameraCapture('UNSURE');
+      lcdOnScanStart(data.slot, data.expected_med);
+      logEvent('Analyzing camera capture for slot ' + (data.slot || '?'), 'unsure');
+      break;
+    }
+
+    // ── Loading workflow (driven by /load_pill on the server) ──────────────
+    case 'load_started': {
+      const slot = parseInt(data.slot) || 1;
+      const medName = data.med_name || ('slot ' + slot);
+      state.activeSlot = slot;
+      document.getElementById('m-slot').textContent = slot;
+      // Make full enclosure transparent so pill path is visible immediately
+      setZoneFrac(0, 1, 0.13);
+      _showMedOverlay('Loading: ' + medName);
+      logEvent('▶ Loading ' + medName + ' into slot ' + slot, 'match');
+      break;
+    }
+
+    case 'pill_in_chamber': {
+      // Hatch is already open from a previous event; show pill inside the chamber
+      setTransparent('chamber_ceiling', 0.18);
+      // Cutaway: upper 35% of enclosure — where the detection chamber sits
+      setZoneFrac(0.65, 1.0, 0.12);
+      const p = getPartCenter('chamber_ceiling');
+      pillTo(p, 1, true);  // snap pill into chamber, fully visible
+      state.targetLedIntensity = 3.0;
+      logEvent('● Pill in detection chamber', 'match');
+      break;
+    }
+
+    case 'detection_complete': {
+      const result = (data.result || 'UNKNOWN').toUpperCase();
+      const conf = ((data.confidence || 0) * 100).toFixed(0);
+      const colour = resultHex(result);
+      const logType = result === 'MATCH' ? 'match' : (result === 'UNSURE' ? 'unsure' : 'status');
+      onDetectionMatch(data);
+      updateDetectionPanel(data);
+      showCameraCapture(result, 2400);
+      showDetectFlash(data, 2500);
+      lcdOnDetectionResult(data);
+      ledGlow.color.setHex(colour);
+      pillMat.color.setHex(colour);
+      pillMat.emissive.setHex(colour);
+      state.targetLedIntensity = 3.0;
+      setTimeout(() => { state.targetLedIntensity = 0; }, 1200);
+      logEvent(result + '  ' + (data.detected_name || data.med_name || '') + '  ' + conf + '%', logType);
+      break;
+    }
+
+    case 'detection_error':
+      showCameraCapture('NO_MATCH', 2400);
+      updateDetectionPanel({
+        result: 'NO_MATCH',
+        confidence: 0,
+        expected_name: data.expected_name || '—',
+        detected_name: data.reason || 'Detection error',
+      });
+      logEvent('Detection error: ' + (data.reason || '?'), 'status');
+      break;
+
+    case 'pill_routing': {
+      // Trapdoor opens, pill drops through routing chute to the carousel slot
+      setTimeout(() => restoreOpacity('chamber_ceiling'), 300);
+      setTransparent('routing_chute', 0.18);
+      // Cutaway: middle section — routing chute from chamber to carousel
+      setZoneFrac(0.40, 0.90, 0.12);
+      // Build flow path: chamber bottom → chute middle → chute exit → slot top
+      const start  = getPartBottom('chamber_ceiling');
+      const middle = getPartCenter('routing_chute');
+      const exit   = getPartBottom('routing_chute');
+      pillFlowPath([start, middle, exit], 1);
+      logEvent('↓ Routing to slot ' + (data.slot || '?'), 'status');
+      break;
+    }
+
+    case 'pill_in_slot': {
+      // Restore routing chute, briefly reveal the slot, then settle
+      setTimeout(() => restoreOpacity('routing_chute'), 400);
+      const slot = parseInt(data.slot) || 1;
+      const slotName = 'cartridge_' + String(slot - 1).padStart(2, '0');
+      // Cutaway: lower-middle section — carousel zone
+      setZoneFrac(0.20, 0.60, 0.12);
+      if (STRUCTURE[slotName]) {
+        setTransparent(slotName, 0.25);
+        const slotPos = getPartCenter(slotName);
+        pillTo(slotPos, 1);
+        setTimeout(() => restoreOpacity(slotName), 1400);
+      }
+      // Pill fades out as it 'becomes part of' the slot's stored stack
+      setTimeout(() => { pill.targetOpacity = 0; }, 1100);
+      logEvent('✓ Stored in slot ' + slot, 'match');
+      if (slotCells[slot - 1]) slotCells[slot - 1].classList.add('filled');
+      lcdOnPillLoaded(slot);
+      break;
+    }
+
+    case 'slot_loaded': {
+      _hideMedOverlay();
+      const slot = parseInt(data.slot) || 1;
+      const cnt  = data.pill_count || 1;
+      logEvent('✓ Slot ' + slot + ' loaded  (' + cnt + ' pill' + (cnt !== 1 ? 's' : '') + ')', 'match');
+      // Restore the cutaway view after a brief settling pause
+      setTimeout(restoreAllZones, 1000);
+      break;
+    }
+
+    // ── Dispense workflow (driven by /dispense on the server) ──────────────
+    case 'dispense_started': {
+      const slot = parseInt(data.slot) || 1;
+      const medName = data.med_name || ('slot ' + slot);
+      state.activeSlot = slot;
+      document.getElementById('m-slot').textContent = slot;
+      if (slotCells[slot - 1]) {
+        slotCells.forEach(c => c.classList.remove('active', 'dispensing'));
+        slotCells[slot - 1].classList.add('dispensing');
+      }
+      // Make the entire enclosure transparent immediately so the pill path is visible
+      setZoneFrac(0, 1, 0.13);
+      _showMedOverlay('Dispensing: ' + medName);
+      logEvent('💊 Dispensing ' + medName + '  (slot ' + slot + ')', 'dispense');
+      break;
+    }
+
+    case 'slot_opening': {
+      // Pill emerges from inside the active carousel slot
+      const slot = parseInt(data.slot) || 1;
+      const slotName = 'cartridge_' + String(slot - 1).padStart(2, '0');
+      // Enclosure already transparent from dispense_started; focus on the slot
+      setZoneFrac(0, 0.6, 0.10);   // lower 60% slightly more transparent
+      if (STRUCTURE[slotName]) {
+        setTransparent(slotName, 0.25);
+        const slotPos = getPartCenter(slotName);
+        pillTo(slotPos, 1, true);
+      }
+      break;
+    }
+
+    case 'pill_falling': {
+      // Pill flows down the dispense chute to the cup
+      setTransparent('pill_chute', 0.18);
+      const top    = getPartTop('pill_chute');
+      const middle = getPartCenter('pill_chute');
+      const bottom = getPartBottom('pill_chute');
+      const cup    = getPartCenter('pill_cup');
+      pillFlowPath([top, middle, bottom, cup], 1);
+      break;
+    }
+
+    case 'pill_in_cup': {
+      const slot = parseInt(data.slot) || 1;
+      const slotName = 'cartridge_' + String(slot - 1).padStart(2, '0');
+      const cup = getPartCenter('pill_cup');
+      pillTo(cup, 1);
+      // Restore structural parts after a brief pause
+      setTimeout(() => {
+        restoreOpacity('pill_chute');
+        if (STRUCTURE[slotName]) restoreOpacity(slotName);
+      }, 500);
+      // Pill fades out (representing user taking it)
+      setTimeout(() => { pill.targetOpacity = 0; }, 2200);
+      logEvent('🥤 Pill in cup', 'dispense');
+      break;
+    }
+
+    case 'dispense_complete':
+      onDispenseComplete(data);
+      _hideMedOverlay();
+      lcdOnDispense(data.slot);
+      // Restore full enclosure opacity after a brief settling pause
+      setTimeout(restoreAllZones, 1500);
+      {
+        const medName = data.med_name ? ('  ' + data.med_name) : '';
+        const remaining = (typeof data.remaining === 'number') ? `  (${data.remaining} left)` : '';
+        logEvent('✓ Dispensed' + medName + '  slot ' + data.slot + remaining, 'dispense');
+      }
+      break;
+
+    case 'loading_started':
+      onLoadingStarted(data);
+      logEvent('Loading slot ' + data.slot, 'match');
+      break;
+
+    case 'loading_complete':
+      logEvent('Loading done  ' + data.total_pills + ' pills', 'match'); break;
+
+    case 'prescription_ack': {
+      const meds = data.count || (data.slots ? data.slots.length : '?');
+      logEvent('📋 Prescription loaded  ' + meds + ' medications', 'match');
+      // Mark slots as assigned on the grid
+      if (data.slots) {
+        data.slots.forEach(s => {
+          const idx = parseInt(s) - 1;
+          if (slotCells[idx]) slotCells[idx].classList.add('filled');
+        });
+      }
+      lcdOnPrescription(data.slots);
+      break;
+    }
+
+    // ── Mechanical demo events ────────────────────────────────────────────────
+
+    case 'hatch_open':
+      state.targetHatchAngle = -Math.PI / 2;
+      logEvent('Hatch opened', 'match'); break;
+
+    case 'hatch_close':
+      state.targetHatchAngle = 0;
+      logEvent('Hatch closed', 'status'); break;
+
+    case 'carousel_rotate': {
+      const sl  = parseInt(data.slot) || 1;
+      state.activeSlot = sl;
+      document.getElementById('m-slot').textContent = sl;
+      const tgt = slotAngle(sl);
+      state.targetCarouselAngle += shortAngle(state.targetCarouselAngle, tgt);
+      if (slotCells[sl - 1]) {
+        slotCells.forEach(c => c.classList.remove('active'));
+        slotCells[sl - 1].classList.add('active');
+      }
+      logEvent('Carousel  slot ' + sl, 'status'); break;
+    }
+
+    case 'carousel_spin_full':
+      state.targetCarouselAngle += Math.PI * 2;
+      logEvent('Carousel full spin', 'match'); break;
+
+    case 'trapdoor_open':
+      state.targetTrapdoorAngle = Math.PI / 2;
+      logEvent('Trapdoor open', 'match'); break;
+
+    case 'trapdoor_close':
+      state.targetTrapdoorAngle = 0;
+      logEvent('Trapdoor closed', 'status'); break;
+
+    case 'dispense_gate_open':
+      state.targetDispenseGateAngle = Math.PI / 2;
+      logEvent('Gate open', 'match'); break;
+
+    case 'dispense_gate_close':
+      state.targetDispenseGateAngle = 0; break;
+
+    case 'dispense_release_gate_open':
+      state.targetReleaseGateAngle = Math.PI / 2;
+      logEvent('Release gate open', 'match'); break;
+
+    case 'dispense_release_gate_close':
+      state.targetReleaseGateAngle = 0; break;
+
+    case 'sweep_pusher_extend':
+      state.targetPusherZ = 1.5;
+      logEvent('Sweep extended', 'match'); break;
+
+    case 'sweep_pusher_retract':
+      state.targetPusherZ = 0;
+      logEvent('Sweep retracted', 'status'); break;
+
+    case 'led_on':
+      state.targetLedIntensity = 3.0;
+      logEvent('LED on', 'match'); break;
+
+    case 'led_off':
+      state.targetLedIntensity = 0; break;
+
+    // ── Pill path events (visual log only — no separate pill mesh) ───────────
+
+    case 'pill_enter_chamber':
+      logEvent('Pill in chamber', 'match'); break;
+
+    case 'pill_drop_through_trapdoor':
+      // The trapdoor opening is the visible cue — handled by trapdoor_open
+      break;
+
+    case 'pill_exit_to_cup':
+      logEvent('Pill in cup', 'dispense'); break;
+
+    // ── Demo lifecycle ────────────────────────────────────────────────────────
+
+    case 'demo_reset':
+      // Return all parts to home position
+      state.targetHatchAngle          = 0;
+      state.targetTrapdoorAngle       = 0;
+      state.targetDispenseGateAngle   = 0;
+      state.targetReleaseGateAngle    = 0;
+      state.targetPusherZ             = 0;
+      state.targetLedIntensity        = 0;
+      logEvent('Reset to home', 'status'); break;
+
+    case 'demo_complete':
+      logEvent('Demo complete', 'match');
+      slotCells.forEach(c => c.classList.remove('active', 'dispensing')); break;
+
+    case 'demo_started':
+      logEvent('Demo started  slot ' + (data.slot || 1), 'match'); break;
+
+    default:
+      // Unknown events — log to console only
+      if (ev && ev !== 'app_connected' && ev !== 'app_disconnected') {
+        console.log('[viewer] event:', ev, data);
+      }
+  }
+}
+
+// ─── Polling system ───────────────────────────────────────────────────────────
 let _serverBase = null;
-let _pollId     = 0;      // last event id received; next poll asks for > this
+let _pollId     = 0;
 let _pollTimer  = null;
 let _connected  = false;
 
-// ── Resolve server URL ───────────────────────────────────────────────────────
-// Priority: 1) ?server= query param  2) same origin (served by Flask)  3) prompt
 function resolveServerUrl() {
   const params = new URLSearchParams(window.location.search);
   if (params.has('server')) return params.get('server').replace(/\/$/, '');
@@ -582,130 +1882,92 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── Poll loop ────────────────────────────────────────────────────────────────
 function startPolling() {
-  if (!_serverBase) {
-    _serverBase = resolveServerUrl();
-  }
+  if (!_serverBase) _serverBase = resolveServerUrl();
   if (!_serverBase) {
     document.getElementById('server-prompt').classList.add('visible');
-    document.getElementById('conn-label').textContent = 'Enter server URL →';
+    document.getElementById('conn-label').textContent = 'Enter server URL';
     document.getElementById('server-label').textContent = 'no server';
-    console.log('[viewer] No server URL — file:// or origin missing');
     return;
   }
   document.getElementById('server-label').textContent = _serverBase;
-  console.log('[viewer] Polling started against:', _serverBase + '/events/recent');
+  console.log('[viewer] Polling:', _serverBase + '/events/recent');
+  preloadQrImage();   // fetch /setup.png for the LCD idle screen
   _poll();
 }
 
 function _poll() {
-  const url = `${_serverBase}/events/recent?since=${_pollId}`;
-  // AbortSignal.timeout() requires Chrome 103+ — use AbortController for compat
-  const ctrl    = new AbortController();
-  const timerId = setTimeout(() => ctrl.abort(), 4000);
+  const url  = `${_serverBase}/events/recent?since=${_pollId}`;
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), 4000);
   fetch(url, { signal: ctrl.signal })
-    .then(r => {
-      clearTimeout(timerId);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
+    .then(r => { clearTimeout(tid); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(data => {
-      // ── Connected ──
       if (!_connected) {
         _connected = true;
-        document.getElementById('conn-dot').className = 'status-dot connected';
-        document.getElementById('conn-label').textContent = 'Connected';
-        logEvent('Connected to dispenser server', 'status');
-        console.log('[viewer] First poll OK:', data);
+        logEvent('Server reachable', 'status');
       }
-
-      // ── Server status ──
-      onStatusChange(data.status || 'idle');
-
-      // ── New events since last poll ──
+      const appConnected = data.app_connected === true || (data.state && data.state.app_connected === true);
+      updateConnection(appConnected, true);
+      onStatusChange(data.status || (data.state && data.state.status) || 'idle');
       (data.events || []).forEach(ev => handleEvent(ev));
-
-      // Advance the cursor
       if (typeof data.next_id === 'number') _pollId = data.next_id;
-
       _pollTimer = setTimeout(_poll, 500);
     })
-    .catch((err) => {
-      clearTimeout(timerId);
-      // Connection lost / server not reachable
+    .catch(err => {
+      clearTimeout(tid);
       _connected = false;
-      document.getElementById('conn-dot').className = 'status-dot';
-      document.getElementById('conn-label').textContent = 'Reconnecting…';
-      console.warn('[viewer] Poll failed:', err && err.message || err, 'url=', url);
-      _pollTimer = setTimeout(_poll, 2000);   // retry slower when down
+      updateConnection(false, false);
+      _pollTimer = setTimeout(_poll, 2000);
     });
 }
 
-// ── Event dispatcher (same logic as the old SSE onmessage) ──────────────────
-function handleEvent(data) {
-  const ev = data.event || '';
-  switch (ev) {
-    case 'status':
-      onStatusChange(data.value || 'idle');
-      break;
-    case 'detection_result':
-      if (data.result === 'MATCH') {
-        onDetectionMatch(data);
-        logEvent(`✓ MATCH  slot ${data.slot}  ${((data.confidence||0)*100).toFixed(0)}%`, 'match');
-      } else if (data.result === 'UNSURE') {
-        logEvent(`? UNSURE  slot ${data.slot}`, 'unsure');
-      } else {
-        logEvent(`✗ NO_MATCH`, 'status');
-      }
-      break;
-    case 'dispense_complete':
-      onDispenseComplete(data);
-      logEvent(`💊 Dispensed  slot ${data.slot}  ${data.weight_measured_mg||'?'}mg`, 'dispense');
-      break;
-    case 'loading_started':
-      onLoadingStarted(data);
-      logEvent(`📥 Loading slot ${data.slot}`, 'match');
-      break;
-    case 'loading_complete':
-      logEvent(`✅ Loading done  ${data.total_pills} pills`, 'match');
-      break;
-    case 'prescription_ack':
-      logEvent(`📋 Prescription loaded  ${data.count} meds`, 'status');
-      break;
-  }
+// ─── Orbit controls ───────────────────────────────────────────────────────────
+let isDragging = false, lastX = 0, lastY = 0;
+const spherical = { theta: Math.PI * 0.25, phi: Math.PI * 0.32 };
+let orbitRadius = 4;       // overwritten by fitCameraToModel()
+const orbitTarget = new THREE.Vector3(0, 0.5, 0);
+
+function updateCamera() {
+  const sinPhi = Math.sin(spherical.phi);
+  camera.position.set(
+    orbitTarget.x + orbitRadius * sinPhi * Math.sin(spherical.theta),
+    orbitTarget.y + orbitRadius * Math.cos(spherical.phi),
+    orbitTarget.z + orbitRadius * sinPhi * Math.cos(spherical.theta)
+  );
+  camera.lookAt(orbitTarget);
 }
 
-// ─── Orbit controls (simple mouse drag) ──────────────────────────────────────
-let isDragging = false, lastX = 0, lastY = 0;
-let spherical = { theta: Math.atan2(12, 20), phi: Math.atan2(18, Math.sqrt(12*12+20*20)) };
-const orbitRadius = 26;
-
-document.getElementById('canvas-container').addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+const cc = document.getElementById('canvas-container');
+cc.addEventListener('mousedown',  e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
 window.addEventListener('mouseup', () => isDragging = false);
 window.addEventListener('mousemove', e => {
   if (!isDragging) return;
-  spherical.theta -= (e.clientX - lastX) * 0.008;
-  spherical.phi   = Math.max(0.1, Math.min(Math.PI/2 - 0.05, spherical.phi - (e.clientY - lastY) * 0.006));
+  spherical.theta -= (e.clientX - lastX) * 0.007;
+  spherical.phi    = Math.max(0.08, Math.min(Math.PI / 2 - 0.04, spherical.phi - (e.clientY - lastY) * 0.005));
   lastX = e.clientX; lastY = e.clientY;
-  camera.position.set(
-    orbitRadius * Math.sin(spherical.phi) * Math.sin(spherical.theta),
-    orbitRadius * Math.cos(spherical.phi) + 7.5,
-    orbitRadius * Math.sin(spherical.phi) * Math.cos(spherical.theta) + 4.5
-  );
-  camera.lookAt(0, 7.5, 4.5);
+  updateCamera();
 });
-
-// Scroll to zoom
+// Wheel zooms by changing orbit distance (proportional to current radius)
 window.addEventListener('wheel', e => {
-  camera.fov = Math.max(20, Math.min(80, camera.fov + e.deltaY * 0.02));
-  camera.updateProjectionMatrix();
-});
+  orbitRadius = Math.max(0.1, Math.min(orbitRadius * 200, orbitRadius * (1 + e.deltaY * 0.001)));
+  updateCamera();
+}, { passive: true });
 
-// ─── Resize handler ───────────────────────────────────────────────────────────
+// Touch
+cc.addEventListener('touchstart',  e => { isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; }, { passive: true });
+cc.addEventListener('touchend',    () => isDragging = false);
+cc.addEventListener('touchmove',   e => {
+  if (!isDragging) return;
+  spherical.theta -= (e.touches[0].clientX - lastX) * 0.007;
+  spherical.phi    = Math.max(0.08, Math.min(Math.PI/2-0.04, spherical.phi - (e.touches[0].clientY - lastY) * 0.005));
+  lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+  updateCamera();
+}, { passive: true });
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
 function onResize() {
-  const container = document.getElementById('canvas-container');
-  const w = container.clientWidth, h = container.clientHeight;
+  const w = cc.clientWidth, h = cc.clientHeight;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
@@ -719,59 +1981,212 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
-  const t = Math.min(dt * 3, 1);   // lerp speed
+  const t  = Math.min(dt * 3.5, 1);   // lerp coefficient
 
-  // Smooth carousel rotation
+  // ── Animate each named part using its own pivot Group ──────────────────────
+  // Spec axis can be 'x', 'y', 'z' (rotation) or 'translate_z' (linear).
+  // Using shortAngle for carousel so it always picks the shorter rotation path.
   state.carouselAngle += shortAngle(state.carouselAngle, state.targetCarouselAngle) * t;
-  carouselGroup.rotation.y = -state.carouselAngle;
+  state.trapdoorAngle      = lerp(state.trapdoorAngle,      state.targetTrapdoorAngle,      t);
+  state.hatchAngle         = lerp(state.hatchAngle,         state.targetHatchAngle,         t);
+  state.dispenseGateAngle  = lerp(state.dispenseGateAngle,  state.targetDispenseGateAngle,  t);
+  state.releaseGateAngle   = lerp(state.releaseGateAngle,   state.targetReleaseGateAngle,   t);
+  state.pusherZ            = lerp(state.pusherZ,            state.targetPusherZ,            t);
 
-  // Trapdoor animation (leaves hinge open/close)
-  state.trapdoorAngle = lerp(state.trapdoorAngle, state.targetTrapdoorAngle, t);
-  tdLeft.rotation.z  =  state.trapdoorAngle;
-  tdRight.rotation.z = -state.trapdoorAngle;
+  // Map state to part rotations (each part's pivot Group rotates around its hinge)
+  const angleFor = {
+    carousel:              state.carouselAngle,
+    hatch_final:           state.hatchAngle,
+    trapdoor_left:         state.trapdoorAngle,
+    trapdoor_right:        state.trapdoorAngle,
+    dispense_gate:         state.dispenseGateAngle,
+    dispense_release_gate: state.releaseGateAngle,
+    dispense_sweep_pusher: state.pusherZ,
+  };
 
-  // Pill opacity and drop
-  state.pillOpacity = lerp(state.pillOpacity, state.targetPillOpacity, t);
-  mat.pill.opacity  = state.pillOpacity;
-  state.pillY = lerp(state.pillY, state.targetPillY, t * 0.6);
-  pillMesh.position.y = state.pillY;
+  for (const [name, entry] of Object.entries(PARTS)) {
+    if (!entry.group) continue;
+    const a = angleFor[name] || 0;
+    const sign = entry.spec.sign;
+    const axis = entry.spec.axis;
+    if (axis === 'translate_z') {
+      // Linear motion (sweep pusher) — modest amplitude scaled to model size
+      entry.group.position.z = (entry.basePosition || 0) + sign * a * MODEL_INFO.height * 0.05;
+    } else {
+      entry.group.rotation[axis] = sign * a;
+    }
+  }
 
-  // LED glow
+  // ── LED glow ─────────────────────────────────────────────────────────────────
   state.ledIntensity = lerp(state.ledIntensity, state.targetLedIntensity, t);
   ledGlow.intensity  = state.ledIntensity;
-  ledGlow.position.set(CAROUSEL_X, CEIL_Z, CAROUSEL_Y);
-  mat.led.emissiveIntensity = 0.5 + state.ledIntensity * 0.3;
 
-  // Subtle idle rotation for visual interest
-  if (Math.abs(shortAngle(state.carouselAngle, state.targetCarouselAngle)) < 0.005) {
-    // tiny ambient wobble
+  // ── Travelling pill (chamber → chute → slot, etc.) ──────────────────────────
+  // If we have waypoints, advance through them when each is reached
+  if (pill.waypoints.length > 0) {
+    const cur = pill.waypoints[pill.waypointIdx];
+    const dist = pill.pos.distanceTo(cur);
+    if (dist < 0.3 && pill.waypointIdx < pill.waypoints.length - 1) {
+      pill.waypointIdx++;
+      pill.targetPos.copy(pill.waypoints[pill.waypointIdx]);
+    } else {
+      pill.targetPos.copy(cur);
+    }
   }
+  pill.pos.lerp(pill.targetPos, Math.min(dt * 2.5, 1));
+  pill.opacity = lerp(pill.opacity, pill.targetOpacity, t);
+  pillMesh.position.copy(pill.pos);
+  pillMat.opacity = pill.opacity;
 
   renderer.render(scene, camera);
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────
+loadModel();
 startPolling();
 animate();
 
-// Touch support for mobile
-document.getElementById('canvas-container').addEventListener('touchstart', e => {
-  isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-}, {passive:true});
-document.getElementById('canvas-container').addEventListener('touchend', () => isDragging = false);
-document.getElementById('canvas-container').addEventListener('touchmove', e => {
-  if (!isDragging) return;
-  const dx = e.touches[0].clientX - lastX, dy = e.touches[0].clientY - lastY;
-  spherical.theta -= dx * 0.008;
-  spherical.phi = Math.max(0.1, Math.min(Math.PI/2 - 0.05, spherical.phi - dy * 0.006));
-  lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-  camera.position.set(
-    orbitRadius * Math.sin(spherical.phi) * Math.sin(spherical.theta),
-    orbitRadius * Math.cos(spherical.phi) + 7.5,
-    orbitRadius * Math.sin(spherical.phi) * Math.cos(spherical.theta) + 4.5
-  );
-  camera.lookAt(0, 7.5, 4.5);
-}, {passive:true});
+// ─── Test Detect Panel ────────────────────────────────────────────────────────
+(function initTestPanel() {
+  const fileInput    = document.getElementById('test-file-input');
+  const dropZone     = document.getElementById('test-drop-zone');
+  const previewWrap  = document.getElementById('test-preview-wrap');
+  const previewImg   = document.getElementById('test-preview');
+  const runBtn       = document.getElementById('test-run-btn');
+  const slotSel      = document.getElementById('test-slot');
+  const resultBadge  = document.getElementById('test-result-badge');
+  const datasetGrid  = document.getElementById('dataset-grid');
+
+  let _selectedFile = null;
+
+  // ── File selection via input ──
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  });
+
+  // ── Drag and drop ──
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = '#7eb8ff';
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.style.borderColor = '#334';
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.style.borderColor = '#334';
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) selectFile(f);
+  });
+
+  function selectFile(file) {
+    _selectedFile = file;
+    const url = URL.createObjectURL(file);
+    previewImg.src = url;
+    previewWrap.style.display = 'block';
+    resultBadge.style.display = 'none';
+  }
+
+  // ── Run detection ──
+  runBtn.addEventListener('click', () => {
+    if (!_selectedFile) return;
+    runDetect(_selectedFile);
+  });
+
+  function runDetect(file) {
+    const slot = slotSel.value;
+    resultBadge.style.display = 'none';
+    runBtn.textContent = '⏳ Analyzing…';
+    runBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('slot', slot);
+    fd.append('image', file, file.name || 'pill.jpg');
+
+    fetch(`${_serverBase}/detect`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        runBtn.textContent = '▶ Run Detection';
+        runBtn.disabled = false;
+        if (!data.ok) {
+          showBadge('⚠ ' + (data.reason || 'error'), '#ff6644', '#3a1a0a');
+          return;
+        }
+        const res  = (data.result || '').toUpperCase();
+        const conf = Math.round((data.confidence || 0) * 100);
+        const name = data.detected_name || data.detected_nhi || '?';
+        const color = res === 'MATCH'  ? '#4cff8a' :
+                      res === 'UNSURE' ? '#ffdd44' : '#ff6644';
+        const bg    = res === 'MATCH'  ? '#0a2a12' :
+                      res === 'UNSURE' ? '#2a2500' : '#2a0a0a';
+        showBadge(`${res}  ${conf}%\n${name}`, color, bg);
+      })
+      .catch(err => {
+        runBtn.textContent = '▶ Run Detection';
+        runBtn.disabled = false;
+        showBadge('⚠ ' + err.message, '#ff6644', '#2a0a0a');
+      });
+  }
+
+  function showBadge(text, color, bg) {
+    resultBadge.style.display = 'block';
+    resultBadge.style.color = color;
+    resultBadge.style.borderColor = color + '55';
+    resultBadge.style.background = bg;
+    resultBadge.style.whiteSpace = 'pre';
+    resultBadge.textContent = text;
+  }
+
+  // ── Load dataset thumbnails ──
+  fetch(`${_serverBase}/dataset_images`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data || !data.images || !data.images.length) {
+        datasetGrid.innerHTML = '<div style="font-size:10px;color:#445;">Dataset not available</div>';
+        return;
+      }
+      // Show up to 40 images (prefer is_ref=true, then is_front=true)
+      const sorted = data.images
+        .sort((a, b) => (b.is_ref - a.is_ref) || (b.is_front - a.is_front))
+        .slice(0, 40);
+      datasetGrid.innerHTML = '';
+      for (const img of sorted) {
+        const thumb = document.createElement('div');
+        thumb.title = img.label;
+        thumb.style.cssText = `
+          cursor:pointer; border-radius:4px; overflow:hidden;
+          border:1px solid #223; aspect-ratio:1;
+          background:#111a2e; position:relative;`;
+        const im = document.createElement('img');
+        im.src = `${_serverBase}/dataset_images/${encodeURIComponent(img.filename)}`;
+        im.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+        im.loading = 'lazy';
+        thumb.appendChild(im);
+        if (img.is_ref) {
+          const badge = document.createElement('div');
+          badge.textContent = 'REF';
+          badge.style.cssText = `
+            position:absolute;bottom:0;left:0;right:0;
+            background:#4cff8a33;color:#4cff8a;font-size:8px;
+            text-align:center;line-height:1.4;`;
+          thumb.appendChild(badge);
+        }
+        thumb.addEventListener('click', async () => {
+          // Fetch as blob and treat as uploaded file
+          const resp = await fetch(im.src);
+          const blob = await resp.blob();
+          const file = new File([blob], img.filename, { type: 'image/jpeg' });
+          selectFile(file);
+          previewImg.src = im.src;  // show same URL directly (already loaded)
+        });
+        datasetGrid.appendChild(thumb);
+      }
+    })
+    .catch(() => {
+      datasetGrid.innerHTML = '<div style="font-size:10px;color:#445;">Could not load dataset</div>';
+    });
+})();
 </script>
 </body>
 </html>
